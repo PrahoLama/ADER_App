@@ -16,7 +16,7 @@ O aplicație React Native cu backend Python pentru analiza viilor. Deocamdata es
 
 ---
 
-## 🚀 Începem
+## Ghid
 
 ### Pasul 1: Clonează Repository-ul
 
