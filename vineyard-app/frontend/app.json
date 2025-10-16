@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Vineyard Analysis",
+    "slug": "vineyard-analysis",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a472a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to photos"
+        }
+      ]
+    ]
+  }
+}
