@@ -12,7 +12,6 @@ O aplicație React Native cu backend Python pentru analiza viilor. Deocamdata es
 - **pip** (Python package manager)
 - **React Native CLI** - Instalează global: `npm install -g react-native-cli`
 - **Expo CLI** (dacă folosești Expo) - Instalează global: `npm install -g expo-cli`
-- **Android Studio** (pentru dezvoltare Android) sau **Xcode** (pentru dezvoltare iOS pe macOS)
 
 ---
 
