@@ -321,6 +321,8 @@ export default function App() {
     console.log('🔥 ANALYZE BUTTON CLICKED');
     console.log('='.repeat(60));
 
+
+
     if (analysisType === 'dji-log' && !selectedLogFile) {
       showAlert('Error', 'Please select a DJI log file');
       return;
