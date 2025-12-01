@@ -15,11 +15,12 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import axios from 'axios';
+import FlightPathMap from './FlightPathMap';
 
 const BACKEND_PORT = 5000;
 
 export default function App() {
-  const [backendIP, setBackendIP] = useState('localhost');
+  const [backendIP, setBackendIP] = useState('10.248.25.211');
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedLogFile, setSelectedLogFile] = useState(null);
   const [analysisType, setAnalysisType] = useState(null);
@@ -28,6 +29,8 @@ export default function App() {
   const [showIPConfig, setShowIPConfig] = useState(false);
   const [backendStatus, setBackendStatus] = useState('checking');
   const [rowsGeojson, setRowsGeojson] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [clusteringMethod, setClusteringMethod] = useState('kmeans');
 
   const BACKEND_URL = `http://${backendIP}:${BACKEND_PORT}/api`;
 
@@ -321,8 +324,7 @@ export default function App() {
     console.log('🔥 ANALYZE BUTTON CLICKED');
     console.log('='.repeat(60));
 
-
-
+    // Validation checks
     if (analysisType === 'dji-log' && !selectedLogFile) {
       showAlert('Error', 'Please select a DJI log file');
       return;
@@ -350,8 +352,12 @@ export default function App() {
     try {
       const formData = new FormData();
 
+      // ===================================================================
+      // DJI LOG PARSING
+      // ===================================================================
       if (analysisType === 'dji-log') {
-        // DJI Log parsing
+        console.log('📄 Processing DJI log file...');
+
         if (Platform.OS === 'web') {
           const response = await fetch(selectedLogFile.uri);
           const blob = await response.blob();
@@ -364,6 +370,8 @@ export default function App() {
           });
         }
 
+        console.log('📡 Sending request to:', `${BACKEND_URL}/parse-dji-log`);
+
         const response = await axios.post(
           `${BACKEND_URL}/parse-dji-log`,
           formData,
@@ -373,10 +381,16 @@ export default function App() {
           }
         );
 
+        console.log('✅ DJI log parsed successfully');
         setResults({ type: 'dji-log', data: response.data.data });
         setSelectedLogFile(null);
 
+        // ===================================================================
+        // DRONE IMAGE ANALYSIS
+        // ===================================================================
       } else if (analysisType === 'drone') {
+        console.log('📷 Processing', selectedImages.length, 'drone images...');
+
         for (let i = 0; i < selectedImages.length; i++) {
           const img = selectedImages[i];
 
@@ -393,6 +407,8 @@ export default function App() {
           }
         }
 
+        console.log('📡 Sending request to:', `${BACKEND_URL}/analyze-drone`);
+
         const response = await axios.post(
           `${BACKEND_URL}/analyze-drone`,
           formData,
@@ -402,12 +418,19 @@ export default function App() {
           }
         );
 
+        console.log('✅ Drone images analyzed successfully');
         setResults({ type: 'drone', data: response.data.data });
         setSelectedImages([]);
 
+        // ===================================================================
+        // ORTHOPHOTO ANALYSIS
+        // ===================================================================
       } else {
+        console.log('🗺️ Processing orthophoto...');
+
         const img = selectedImages[0];
 
+        // Append orthophoto image
         if (Platform.OS === 'web') {
           const response = await fetch(img.uri);
           const blob = await response.blob();
@@ -420,7 +443,14 @@ export default function App() {
           });
         }
 
+        // *** CRITICAL: ADD CLUSTERING METHOD ***
+        formData.append('method', clusteringMethod);
+        console.log('🎯 Clustering method selected:', clusteringMethod);
+
+        // Append rows GeoJSON if provided
         if (rowsGeojson) {
+          console.log('📍 Adding rows GeoJSON...');
+
           if (Platform.OS === 'web') {
             const response = await fetch(rowsGeojson.uri);
             const blob = await response.blob();
@@ -432,7 +462,15 @@ export default function App() {
               name: rowsGeojson.name || 'rows.geojson',
             });
           }
+        } else {
+          console.log('ℹ️ No rows GeoJSON provided (using default path)');
         }
+
+        console.log('📡 Sending request to:', `${BACKEND_URL}/analyze-orthophoto`);
+        console.log('📤 FormData contents:');
+        console.log('   - orthophoto: included');
+        console.log('   - method:', clusteringMethod);
+        console.log('   - rows_geojson:', rowsGeojson ? 'included' : 'not included');
 
         const response = await axios.post(
           `${BACKEND_URL}/analyze-orthophoto`,
@@ -443,16 +481,32 @@ export default function App() {
           }
         );
 
+        console.log('✅ Orthophoto analyzed successfully');
+        console.log('📊 Method used:', response.data.data.method);
+
         setResults({ type: 'orthophoto', data: response.data.data });
         setSelectedImages([]);
         setRowsGeojson(null);
       }
 
     } catch (error) {
-      console.error('❌ ERROR:', error);
+      console.error('❌ ANALYSIS ERROR:', error);
+
+      if (error.response) {
+        console.error('Server response:', error.response.data);
+        console.error('Status code:', error.response.status);
+      } else if (error.request) {
+        console.error('No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+      }
+
       showAlert(
         'Analysis Failed',
-        error.response?.data?.error || error.message || 'Connection failed'
+        error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        'Connection failed. Please check if the backend is running.'
       );
     } finally {
       setLoading(false);
@@ -656,6 +710,54 @@ export default function App() {
               {analysisType === 'orthophoto' && (
                 <>
                   <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Clustering Method</Text>
+                    <Text style={styles.sectionDesc}>
+                      Select the algorithm for detecting bare soil and gaps
+                    </Text>
+                  </View>
+
+                  <View style={styles.methodSelector}>
+                    <TouchableOpacity
+                      style={[styles.methodOption, clusteringMethod === 'kmeans' && styles.methodOptionActive]}
+                      onPress={() => setClusteringMethod('kmeans')}
+                    >
+                      <Text style={[styles.methodText, clusteringMethod === 'kmeans' && styles.methodTextActive]}>
+                        K-Means
+                      </Text>
+                      <Text style={styles.methodDesc}>Fast & Balanced</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.methodOption, clusteringMethod === 'dbscan' && styles.methodOptionActive]}
+                      onPress={() => setClusteringMethod('dbscan')}
+                    >
+                      <Text style={[styles.methodText, clusteringMethod === 'dbscan' && styles.methodTextActive]}>
+                        DBSCAN
+                      </Text>
+                      <Text style={styles.methodDesc}>Density-based</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.methodOption, clusteringMethod === 'slic' && styles.methodOptionActive]}
+                      onPress={() => setClusteringMethod('slic')}
+                    >
+                      <Text style={[styles.methodText, clusteringMethod === 'slic' && styles.methodTextActive]}>
+                        SLIC
+                      </Text>
+                      <Text style={styles.methodDesc}>Superpixel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.methodOption, clusteringMethod === 'meanshift' && styles.methodOptionActive]}
+                      onPress={() => setClusteringMethod('meanshift')}
+                    >
+                      <Text style={[styles.methodText, clusteringMethod === 'meanshift' && styles.methodTextActive]}>
+                        Mean Shift
+                      </Text>
+                      <Text style={styles.methodDesc}>Slow but Accurate</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Rows GeoJSON (Optional)</Text>
                     <Text style={styles.sectionDesc}>
                       Upload rows.geojson file, or leave empty to use default path
@@ -692,20 +794,31 @@ export default function App() {
                   <FlatList
                     data={selectedImages}
                     scrollEnabled={false}
-                    renderItem={({ item, index }) => (
-                      <View style={styles.imageRow}>
-                        <Image
-                          source={{ uri: item.uri }}
-                          style={styles.imageThumbnail}
-                        />
-                        <Text style={styles.imageName} numberOfLines={1}>
-                          {item.uri.split('/').pop()}
-                        </Text>
-                        <TouchableOpacity onPress={() => removeImage(index)}>
-                          <Text style={styles.removeIcon}>✕</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+                    renderItem={({ item, index }) => {
+                      const fileName = item.uri.split('/').pop() || '';
+                      const isTif = fileName.toLowerCase().endsWith('.tif') || fileName.toLowerCase().endsWith('.tiff');
+
+                      return (
+                        <View style={styles.imageRow}>
+                          {isTif ? (
+                            <View style={styles.tifPlaceholder}>
+                              <Text style={styles.tifIcon}>🗺️</Text>
+                            </View>
+                          ) : (
+                            <Image
+                              source={{ uri: item.uri }}
+                              style={styles.imageThumbnail}
+                            />
+                          )}
+                          <Text style={styles.imageName} numberOfLines={1}>
+                            {fileName}
+                          </Text>
+                          <TouchableOpacity onPress={() => removeImage(index)}>
+                            <Text style={styles.removeIcon}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    }}
                     keyExtractor={(_, idx) => idx.toString()}
                   />
                 </View>
@@ -784,70 +897,107 @@ export default function App() {
                 <Text style={styles.metricValue}>{results.data.fileName}</Text>
               </View>
 
-              <View style={styles.metricBox}>
-                <Text style={styles.metricLabel}>Total Records</Text>
-                <Text style={styles.metricValue}>{results.data.summary.totalRecords}</Text>
-              </View>
+              {/* MAP TOGGLE BUTTON */}
+              <TouchableOpacity
+                style={styles.mapToggleBtn}
+                onPress={() => setShowMap(!showMap)}
+              >
+                <Text style={styles.mapToggleBtnEmoji}>{showMap ? '📊' : '🗺️'}</Text>
+                <Text style={styles.mapToggleBtnText}>
+                  {showMap ? 'Show Statistics' : 'View Flight Path Map'}
+                </Text>
+              </TouchableOpacity>
 
-              <View style={styles.metricBox}>
-                <Text style={styles.metricLabel}>Flight Duration</Text>
-                <Text style={styles.metricValue}>{results.data.summary.duration}</Text>
-              </View>
-
-              <Text style={styles.detailsTitle}>Flight Statistics</Text>
-              <View style={styles.resultDetail}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Max Altitude:</Text>
-                  <Text style={styles.detailValue}>{results.data.statistics.maxAltitude}m</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Max Speed:</Text>
-                  <Text style={styles.detailValue}>{results.data.statistics.maxSpeed}m/s</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Total Distance:</Text>
-                  <Text style={styles.detailValue}>{results.data.statistics.totalDistance}m</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Average Speed:</Text>
-                  <Text style={styles.detailValue}>{results.data.statistics.avgSpeed}m/s</Text>
-                </View>
-              </View>
-
-              <Text style={styles.detailsTitle}>Flight Timeline</Text>
-              <View style={styles.resultDetail}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Start Time:</Text>
-                  <Text style={styles.detailValueSmall}>{results.data.summary.startTime}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>End Time:</Text>
-                  <Text style={styles.detailValueSmall}>{results.data.summary.endTime}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.detailsTitle}>Flight Path Sample (First 5 Points)</Text>
-              {results.data.flightPath.slice(0, 5).map((point, idx) => (
-                <View key={idx} style={styles.resultDetail}>
-                  <Text style={styles.detailFilename}>Point {idx + 1}</Text>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Latitude:</Text>
-                    <Text style={styles.detailValue}>{point.latitude.toFixed(6)}</Text>
+              {/* CONDITIONAL RENDERING: MAP OR STATS */}
+              {showMap ? (
+                <View style={styles.mapSection}>
+                  <Text style={styles.detailsTitle}>Flight Path Visualization</Text>
+                  <View style={{ paddingHorizontal: 16 }}>
+                    <FlightPathMap flightPath={results.data.flightPath} />
                   </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Longitude:</Text>
-                    <Text style={styles.detailValue}>{point.longitude.toFixed(6)}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Altitude:</Text>
-                    <Text style={styles.detailValue}>{point.altitude}m</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Relative Alt:</Text>
-                    <Text style={styles.detailValue}>{point.relativeAltitude}m</Text>
+                  <View style={styles.mapLegend}>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#27ae60' }]} />
+                      <Text style={styles.legendText}>Start</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#3498db' }]} />
+                      <Text style={styles.legendText}>Path</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#e74c3c' }]} />
+                      <Text style={styles.legendText}>End</Text>
+                    </View>
                   </View>
                 </View>
-              ))}
+              ) : (
+                <>
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Total Records</Text>
+                    <Text style={styles.metricValue}>{results.data.summary.totalRecords}</Text>
+                  </View>
+
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Flight Duration</Text>
+                    <Text style={styles.metricValue}>{results.data.summary.duration}</Text>
+                  </View>
+
+                  <Text style={styles.detailsTitle}>Flight Statistics</Text>
+                  <View style={styles.resultDetail}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Max Altitude:</Text>
+                      <Text style={styles.detailValue}>{results.data.statistics.maxAltitude}m</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Max Speed:</Text>
+                      <Text style={styles.detailValue}>{results.data.statistics.maxSpeed}m/s</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Total Distance:</Text>
+                      <Text style={styles.detailValue}>{results.data.statistics.totalDistance}m</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Average Speed:</Text>
+                      <Text style={styles.detailValue}>{results.data.statistics.avgSpeed}m/s</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.detailsTitle}>Flight Timeline</Text>
+                  <View style={styles.resultDetail}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Start Time:</Text>
+                      <Text style={styles.detailValueSmall}>{results.data.summary.startTime}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>End Time:</Text>
+                      <Text style={styles.detailValueSmall}>{results.data.summary.endTime}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.detailsTitle}>Flight Path Sample (First 5 Points)</Text>
+                  {results.data.flightPath.slice(0, 5).map((point, idx) => (
+                    <View key={idx} style={styles.resultDetail}>
+                      <Text style={styles.detailFilename}>Point {idx + 1}</Text>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Latitude:</Text>
+                        <Text style={styles.detailValue}>{point.latitude.toFixed(6)}</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Longitude:</Text>
+                        <Text style={styles.detailValue}>{point.longitude.toFixed(6)}</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Altitude:</Text>
+                        <Text style={styles.detailValue}>{point.altitude}m</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Relative Alt:</Text>
+                        <Text style={styles.detailValue}>{point.relativeAltitude}m</Text>
+                      </View>
+                    </View>
+                  ))}
+                </>
+              )}
             </>
           ) : results.type === 'drone' ? (
             <>
@@ -891,6 +1041,14 @@ export default function App() {
             </>
           ) : (
             <>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricLabel}>Clustering Method</Text>
+                <Text style={[styles.metricValue, { fontSize: 20 }]}>
+                  {(results.data.method || 'kmeans').toUpperCase()}
+                </Text>
+
+              </View>
+
               <View style={styles.metricBox}>
                 <Text style={styles.metricLabel}>Gaps Detected</Text>
                 <Text style={styles.metricValue}>{results.data.detected_gaps}</Text>
@@ -1128,7 +1286,7 @@ const styles = StyleSheet.create({
   },
   topBar: {
     backgroundColor: '#1a472a',
-    paddingTop: 12,
+    paddingTop: 30,
     paddingBottom: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -1418,5 +1576,100 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  mapToggleBtn: {
+    marginHorizontal: 16,
+    backgroundColor: '#3498db',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#3498db',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapToggleBtnEmoji: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  mapToggleBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mapSection: {
+    marginBottom: 20,
+  },
+  mapLegend: {
+    marginHorizontal: 16,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
+  },
+
+  methodSelector: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  methodOption: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+  },
+  methodOptionActive: {
+    borderColor: '#2d8659',
+    backgroundColor: '#e8f5e9',
+  },
+  methodText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 2,
+  },
+  methodTextActive: {
+    color: '#2d8659',
+  },
+  methodDesc: {
+    fontSize: 11,
+    color: '#999',
+  },
+  tifPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#2d8659',
+  },
+  tifIcon: {
+    fontSize: 24,
   },
 });

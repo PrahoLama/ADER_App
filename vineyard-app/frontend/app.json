@@ -10,7 +10,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#1a472a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": [
       [
         "expo-image-picker",
@@ -18,6 +20,12 @@
           "photosPermission": "Allow access to photos"
         }
       ]
-    ]
+    ],
+    "android": {
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.vineyardanalysis"
+    }
   }
 }

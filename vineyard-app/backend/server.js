@@ -848,7 +848,6 @@ except Exception as e:
   }
 });
 
-// Analyze orthophoto - Direct Python call
 app.post('/api/analyze-orthophoto', upload.fields([
   { name: 'orthophoto', maxCount: 1 },
   { name: 'rows_geojson', maxCount: 1 }
@@ -862,6 +861,12 @@ app.post('/api/analyze-orthophoto', upload.fields([
       return res.status(400).json({ error: 'No orthophoto uploaded' });
     }
 
+    // GET METHOD FROM REQUEST BODY - WITH ENHANCED DEBUGGING
+    const method = req.body.method || 'kmeans';
+    console.log('🎯 Selected clustering method:', method);
+    console.log('📋 Full req.body:', req.body);
+    console.log('📂 Files received:', Object.keys(req.files));
+
     const orthophotoPath = path.join(uploadDir, req.files.orthophoto[0].filename);
     console.log('📸 Orthophoto:', orthophotoPath);
 
@@ -871,7 +876,7 @@ app.post('/api/analyze-orthophoto', upload.fields([
       console.log('📍 Rows GeoJSON:', rowsPath);
     }
 
-    // Create temporary Python script that modifies vine.py Config and runs analysis
+    // Create temporary Python script with method parameter
     const tempScript = path.join(__dirname, 'temp_ortho_analysis.py');
     const scriptContent = `
 import sys
@@ -886,15 +891,19 @@ Config.ORTHO_PATH = r'${orthophotoPath.replace(/\\/g, '\\\\')}'
 ${rowsPath ? `Config.ROWS_PATH = r'${rowsPath.replace(/\\/g, '\\\\')}'` : ''}
 
 try:
-    # Run the analysis
-    result = analyze_orthophoto()
+    # Run the analysis WITH METHOD PARAMETER
+    print("🔧 Python: Calling analyze_orthophoto with method='${method}'", file=sys.stderr)
+    result = analyze_orthophoto(method='${method}')
     
     if result is None:
         print(json.dumps({"error": "Analysis returned no results"}))
         sys.exit(1)
     
-    # Format output
+    print(f"🔧 Python: Result method is '{result.get('method', 'MISSING')}'", file=sys.stderr)
+    
+    # Format output - FIXED: method is now correctly retrieved
     output = {
+        'method': result.get('method', 'kmeans'),
         'detected_gaps': len(result.get('gaps', [])),
         'total_gap_area_m2': sum(g.get('area_sqm', 0) for g in result.get('gaps', [])),
         'rows_analyzed': result.get('total_rows', 0),
@@ -921,7 +930,13 @@ except Exception as e:
     fs.writeFileSync(tempScript, scriptContent);
 
     // Run Python script
+    console.log('🐍 Calling Python script with method:', method);
     const result = await runPythonScript(tempScript, []);
+
+    console.log('📊 Python result received:');
+    console.log('   - Method:', result.method);
+    console.log('   - Gaps:', result.detected_gaps);
+    console.log('   - Full result:', JSON.stringify(result, null, 2));
 
     // Cleanup
     fs.unlinkSync(tempScript);
@@ -931,6 +946,7 @@ except Exception as e:
     }
 
     console.log('✅ Analysis complete');
+    console.log('📤 Sending to frontend - method:', result.method);
     res.json({ success: true, data: result });
 
   } catch (error) {
@@ -938,7 +954,6 @@ except Exception as e:
     res.status(500).json({ error: error.message });
   }
 });
-
 function runPythonScript(scriptPath, args) {
   return new Promise((resolve, reject) => {
     console.log('🐍 Running Python:', scriptPath);

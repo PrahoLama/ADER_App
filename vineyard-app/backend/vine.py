@@ -12,7 +12,9 @@ from rasterio.features import rasterize
 from skimage import io, measure, filters, morphology
 from sklearn.cluster import KMeans
 from math import radians, sin, cos, sqrt, atan2
-
+from sklearn.cluster import DBSCAN, MeanShift, estimate_bandwidth
+from skimage.segmentation import slic
+from skimage.color import label2rgb
 
 # ================================
 # CONFIGURATION
@@ -205,6 +207,481 @@ def detect_bare_soil_kmeans(r, g, b, n_clusters=4):
 
     return bare_soil_mask, labels, centroids
 
+def detect_bare_soil_dbscan(r, g, b, eps=0.12, min_samples=30, sample_ratio=0.05):
+    """
+    Memory-optimized DBSCAN for bare soil detection in vineyard images
+
+    Key optimizations:
+    - Reduced sample ratio (default 5% instead of 8%)
+    - Smaller maximum sample size to prevent memory overflow
+    - Efficient feature computation with memory management
+    - Simplified grid sampling
+    - Optimized label propagation with smaller batches
+
+    Parameters:
+    -----------
+    r, g, b : numpy arrays
+        Red, green, blue channels
+    eps : float
+        DBSCAN epsilon parameter (default: 0.12)
+    min_samples : int
+        Minimum samples for core point (default: 30)
+    sample_ratio : float
+        Ratio of pixels to sample (default: 0.05 = 5%)
+    """
+    h, w = r.shape
+    total_pixels = h * w
+
+    print(f"   🔧 DBSCAN - Memory Optimized Version")
+    print(f"   📏 Image size: {h}x{w} = {total_pixels:,} pixels")
+
+    # Calculate vegetation indices
+    indices = calculate_vegetation_indices(r, g, b)
+
+    # ============================================================================
+    # STEP 1: EFFICIENT FEATURE ENGINEERING
+    # ============================================================================
+
+    # Normalize RGB efficiently (in-place operations where possible)
+    r_norm = r.astype(np.float32) / 255.0  # Use float32 instead of float64
+    g_norm = g.astype(np.float32) / 255.0
+    b_norm = b.astype(np.float32) / 255.0
+
+    # Compute engineered features
+    redness = r_norm - g_norm
+    brownness = (r_norm + g_norm) * 0.5 - b_norm
+    brightness = (r_norm + g_norm + b_norm) / 3.0
+    greenness_inv = 1.0 - (2 * g_norm - r_norm - b_norm)
+
+    # Stack features - use float32 to save memory
+    features = np.stack([
+        r.flatten().astype(np.float32),
+        g.flatten().astype(np.float32),
+        b.flatten().astype(np.float32),
+        indices['exg'].flatten().astype(np.float32),
+        indices['vari'].flatten().astype(np.float32),
+        indices['ndi'].flatten().astype(np.float32),
+        redness.flatten(),
+        brownness.flatten(),
+        brightness.flatten(),
+        greenness_inv.flatten()
+    ], axis=1)
+
+    # Clear intermediate arrays to free memory
+    del r_norm, g_norm, b_norm, redness, brownness, greenness_inv
+
+    # ============================================================================
+    # STEP 2: NORMALIZATION
+    # ============================================================================
+
+    features_normalized = features.copy()
+    features_normalized[:, 0:3] = features[:, 0:3] / 255.0
+    features_normalized[:, 3:6] = features[:, 3:6] * 1.5
+    features_normalized[:, 6:10] = features[:, 6:10] * 2.0
+
+    del features  # Free original features array
+
+    # ============================================================================
+    # STEP 3: PIXEL FILTERING
+    # ============================================================================
+
+    valid_mask = (
+            (features_normalized[:, 0] > 0.04) & (features_normalized[:, 0] < 0.96) &
+            (features_normalized[:, 1] > 0.04) & (features_normalized[:, 1] < 0.96) &
+            (features_normalized[:, 2] > 0.04) & (features_normalized[:, 2] < 0.96) &
+            (features_normalized[:, 8] > 0.1) & (features_normalized[:, 8] < 0.9)  # brightness
+    )
+
+    valid_features = features_normalized[valid_mask]
+    valid_indices = np.where(valid_mask)[0]
+
+    del features_normalized  # Free memory
+
+    print(f"   📊 Valid pixels: {len(valid_features):,} ({len(valid_features) / total_pixels * 100:.1f}%)")
+
+    # ============================================================================
+    # STEP 4: OPTIMIZED SAMPLING - REDUCED SIZE
+    # ============================================================================
+
+    # CRITICAL: Reduced max_samples to prevent memory crashes
+    max_samples = 12000  # Reduced from 25000
+    sample_size = min(max_samples, int(len(valid_features) * sample_ratio))
+    sample_size = max(sample_size, 5000)  # Minimum samples
+    sample_size = min(sample_size, len(valid_features))  # Can't exceed available
+
+    print(f"   🎯 Sampling {sample_size:,} pixels ({sample_size / len(valid_features) * 100:.1f}%)")
+
+    # Simplified grid sampling - smaller grid for efficiency
+    grid_size = 8  # Reduced from 12
+    samples_per_cell = max(1, sample_size // (grid_size * grid_size))
+
+    sampled_indices = []
+
+    for i in range(grid_size):
+        for j in range(grid_size):
+            row_start = int(i * h / grid_size)
+            row_end = int((i + 1) * h / grid_size)
+            col_start = int(j * w / grid_size)
+            col_end = int((j + 1) * w / grid_size)
+
+            # Find valid pixels in cell
+            cell_pixel_indices = []
+            for row in range(row_start, row_end):
+                for col in range(col_start, col_end):
+                    pixel_idx = row * w + col
+                    if valid_mask[pixel_idx]:
+                        # Find position in valid_features array
+                        valid_pos = np.searchsorted(valid_indices, pixel_idx)
+                        if valid_pos < len(valid_indices) and valid_indices[valid_pos] == pixel_idx:
+                            cell_pixel_indices.append(valid_pos)
+
+            # Sample from cell
+            if len(cell_pixel_indices) > 0:
+                n_samples = min(samples_per_cell, len(cell_pixel_indices))
+                selected = np.random.choice(cell_pixel_indices, n_samples, replace=False)
+                sampled_indices.extend(selected)
+
+    sampled_indices = np.array(sampled_indices)
+
+    # Fill to target size
+    remaining = sample_size - len(sampled_indices)
+    if remaining > 0:
+        available = np.setdiff1d(np.arange(len(valid_features)), sampled_indices)
+        if len(available) > 0:
+            additional = np.random.choice(available, min(remaining, len(available)), replace=False)
+            sampled_indices = np.concatenate([sampled_indices, additional])
+
+    # Limit to target size if oversampled
+    if len(sampled_indices) > sample_size:
+        sampled_indices = sampled_indices[:sample_size]
+
+    sample_features = valid_features[sampled_indices]
+    print(f"   🔬 Final sample size: {len(sample_features):,}")
+
+    # ============================================================================
+    # STEP 5: DBSCAN CLUSTERING
+    # ============================================================================
+
+    print(f"   ⚙️ Running DBSCAN (eps={eps:.4f}, min_samples={min_samples})...")
+
+    try:
+        dbscan = DBSCAN(
+            eps=eps,
+            min_samples=min_samples,
+            algorithm='ball_tree',
+            n_jobs=2,  # Limit parallelization to prevent memory spike
+            leaf_size=40
+        )
+
+        sample_labels = dbscan.fit_predict(sample_features)
+
+        n_clusters = len(np.unique(sample_labels[sample_labels >= 0]))
+        n_noise = np.sum(sample_labels == -1)
+
+        print(f"   ✅ DBSCAN complete")
+        print(f"   📊 Clusters found: {n_clusters}")
+        print(f"   🔇 Noise points: {n_noise:,} ({n_noise / len(sample_labels) * 100:.1f}%)")
+
+        if n_clusters == 0:
+            print(f"   ⚠️ No clusters found - falling back to threshold method")
+            raise ValueError("No clusters found")
+
+    except Exception as e:
+        print(f"   ❌ DBSCAN failed: {e}")
+        print(f"   🔄 Using threshold-based detection instead")
+        bare_soil_mask = (indices['exg'] < np.percentile(indices['exg'], 30))
+        return bare_soil_mask, np.zeros((h, w), dtype=int), np.array([])
+
+    # ============================================================================
+    # STEP 6: OPTIMIZED LABEL PROPAGATION
+    # ============================================================================
+
+    print(f"   🔄 Propagating labels (this may take a moment)...")
+
+    valid_clusters = sample_labels >= 0
+
+    if np.sum(valid_clusters) > 100:  # Need enough samples
+        from sklearn.neighbors import KNeighborsClassifier
+
+        knn = KNeighborsClassifier(
+            n_neighbors=5,
+            weights='distance',
+            algorithm='ball_tree',
+            n_jobs=2  # Limit parallelization
+        )
+
+        knn.fit(sample_features[valid_clusters], sample_labels[valid_clusters])
+
+        # Predict in SMALLER batches to prevent memory crash
+        batch_size = 20000  # Reduced from 50000
+        all_labels = np.full(len(valid_features), -1, dtype=np.int32)
+
+        n_batches = (len(valid_features) + batch_size - 1) // batch_size
+
+        for batch_idx, start_idx in enumerate(range(0, len(valid_features), batch_size)):
+            end_idx = min(start_idx + batch_size, len(valid_features))
+            batch = valid_features[start_idx:end_idx]
+
+            # Simple prediction without probability threshold
+            predictions = knn.predict(batch)
+            all_labels[start_idx:end_idx] = predictions
+
+            if batch_idx % 5 == 0:
+                print(f"      Batch {batch_idx + 1}/{n_batches}: {end_idx:,}/{len(valid_features):,} pixels")
+
+        print(f"   ✅ Label propagation complete")
+    else:
+        all_labels = np.full(len(valid_features), -1, dtype=np.int32)
+        print(f"   ⚠️ Insufficient valid clusters")
+
+    # ============================================================================
+    # STEP 7: RECONSTRUCT IMAGE
+    # ============================================================================
+
+    labels = np.full(total_pixels, -1, dtype=np.int32)
+    labels[valid_mask] = all_labels
+    labels = labels.reshape(h, w)
+
+    # ============================================================================
+    # STEP 8: CLUSTER ANALYSIS
+    # ============================================================================
+
+    unique_labels = np.unique(sample_labels[sample_labels >= 0])
+    centroids = []
+    cluster_sizes = []
+
+    for label in unique_labels:
+        cluster_mask = (sample_labels == label)
+        cluster_features = sample_features[cluster_mask]
+        centroid = np.mean(cluster_features, axis=0)
+        centroids.append(centroid)
+        cluster_sizes.append(np.sum(cluster_mask))
+
+    centroids = np.array(centroids) if len(centroids) > 0 else np.array([])
+    cluster_sizes = np.array(cluster_sizes)
+
+    # ============================================================================
+    # STEP 9: SOIL IDENTIFICATION
+    # ============================================================================
+
+    if len(centroids) > 0:
+        print(f"   🔍 Identifying soil cluster...")
+
+        soil_scores = []
+
+        for i, (centroid, size) in enumerate(zip(centroids, cluster_sizes)):
+            # Denormalize
+            r_val = centroid[0] * 255
+            exg_val = centroid[3] / 1.5
+            vari_val = centroid[4] / 1.5
+            redness = centroid[6] / 2.0
+            brownness = centroid[7] / 2.0
+            brightness = centroid[8] / 2.0
+
+            # Soil scoring
+            color_score = redness * 50 + brownness * 40
+            veg_score = -(exg_val + vari_val) * 60
+            brightness_score = 20 if (0.3 < brightness < 0.7) else 0
+            size_score = min(15, (size / len(sample_features)) * 150)
+
+            total_score = color_score + veg_score + brightness_score + size_score
+            soil_scores.append(total_score)
+
+            print(f"      Cluster {i}: score={total_score:.1f}, size={size:,}")
+
+        soil_cluster_idx = np.argmax(soil_scores)
+        soil_cluster = unique_labels[soil_cluster_idx]
+
+        print(f"   ✅ Selected cluster {soil_cluster} as SOIL")
+
+        bare_soil_mask = (labels == soil_cluster)
+        soil_coverage = np.sum(bare_soil_mask) / bare_soil_mask.size * 100
+        print(f"   📊 Soil coverage: {soil_coverage:.1f}%")
+
+    else:
+        print(f"   ❌ No valid clusters")
+        bare_soil_mask = np.zeros((h, w), dtype=bool)
+
+    # ============================================================================
+    # STEP 10: MORPHOLOGICAL CLEANUP
+    # ============================================================================
+
+    print(f"   🧹 Cleaning up mask...")
+
+    from skimage import morphology
+
+    bare_soil_mask = morphology.binary_opening(bare_soil_mask, morphology.disk(2))
+    bare_soil_mask = morphology.binary_closing(bare_soil_mask, morphology.disk(3))
+    bare_soil_mask = morphology.remove_small_objects(bare_soil_mask, min_size=50)
+    bare_soil_mask = morphology.remove_small_holes(bare_soil_mask, area_threshold=100)
+
+    final_coverage = np.sum(bare_soil_mask) / bare_soil_mask.size * 100
+    print(f"   ✅ Final coverage: {final_coverage:.1f}%")
+
+    return bare_soil_mask, labels, centroids
+
+def detect_bare_soil_slic(r, g, b, n_segments=1000, compactness=10):
+    """Detect bare soil using SLIC superpixel segmentation"""
+    h, w = r.shape
+
+    # Create RGB image for SLIC
+    rgb_img = np.stack([r, g, b], axis=2)
+
+    # SLIC segmentation
+    print(f"   Running SLIC (n_segments={n_segments}, compactness={compactness})...")
+    segments = slic(rgb_img, n_segments=n_segments, compactness=compactness,
+                    start_label=0, channel_axis=2)
+
+    # Calculate features for each superpixel
+    indices = calculate_vegetation_indices(r, g, b)
+    n_superpixels = segments.max() + 1
+
+    superpixel_features = []
+    for i in range(n_superpixels):
+        mask = (segments == i)
+        if np.sum(mask) == 0:
+            continue
+
+        # Average RGB and indices for this superpixel
+        r_mean = np.mean(r[mask])
+        g_mean = np.mean(g[mask])
+        b_mean = np.mean(b[mask])
+        exg_mean = np.mean(indices['exg'][mask])
+        exgr_mean = np.mean(indices['exgr'][mask])
+        ndi_mean = np.mean(indices['ndi'][mask])
+        vari_mean = np.mean(indices['vari'][mask])
+        grvi_mean = np.mean(indices['grvi'][mask])
+        rgbvi_mean = np.mean(indices['rgbvi'][mask])
+
+        superpixel_features.append([
+            i, r_mean, g_mean, b_mean, exg_mean, exgr_mean,
+            ndi_mean, vari_mean, grvi_mean, rgbvi_mean
+        ])
+
+    superpixel_features = np.array(superpixel_features)
+
+    # Identify soil superpixels
+    soil_scores = []
+    for feat in superpixel_features:
+        r_val, g_val, b_val = feat[1], feat[2], feat[3]
+        exg_val, exgr_val, vari_val = feat[4], feat[5], feat[7]
+
+        rgb_soil_score = (r_val - g_val) + (r_val - b_val) + (g_val - b_val) * 0.5
+        veg_indices_score = -(exg_val + exgr_val + vari_val) * 100
+
+        brightness = (r_val + g_val + b_val) / 3
+        brightness_bonus = 30 if 80 < brightness < 180 else 0
+
+        soil_score = rgb_soil_score + veg_indices_score + brightness_bonus
+        soil_scores.append(soil_score)
+
+    # Select top soil superpixels (top 25%)
+    threshold = np.percentile(soil_scores, 75)
+    soil_superpixel_ids = superpixel_features[np.array(soil_scores) > threshold, 0].astype(int)
+
+    # Create soil mask
+    bare_soil_mask = np.isin(segments, soil_superpixel_ids)
+
+    # Morphological cleanup
+    bare_soil_mask = morphology.binary_opening(bare_soil_mask, morphology.disk(2))
+    bare_soil_mask = morphology.binary_closing(bare_soil_mask, morphology.disk(3))
+
+    # Create centroids for visualization
+    centroids = superpixel_features[:, 1:4]  # RGB values only
+
+    return bare_soil_mask, segments, centroids
+
+
+def detect_bare_soil_meanshift(r, g, b, bandwidth=None):
+    """Detect bare soil using Mean Shift clustering"""
+    h, w = r.shape
+
+    indices = calculate_vegetation_indices(r, g, b)
+
+    # Feature vector
+    features = np.stack([
+        r.flatten(),
+        g.flatten(),
+        b.flatten(),
+        indices['exg'].flatten(),
+        indices['exgr'].flatten(),
+        indices['ndi'].flatten(),
+        indices['vari'].flatten(),
+        indices['grvi'].flatten(),
+        indices['rgbvi'].flatten()
+    ], axis=1)
+
+    # Normalize
+    features_normalized = features.copy()
+    features_normalized[:, 0:3] = features[:, 0:3] / 255.0
+    features_normalized[:, 3:] = features[:, 3:] * 2.0
+
+    # Filter valid pixels
+    valid_mask = (features[:, 0] > 10) & (features[:, 0] < 245) & \
+                 (features[:, 1] > 10) & (features[:, 1] < 245) & \
+                 (features[:, 2] > 10) & (features[:, 2] < 245)
+
+    valid_features = features_normalized[valid_mask]
+
+    # Subsample for speed (Mean Shift is slow)
+    sample_size = min(10000, len(valid_features))
+    sample_indices = np.random.choice(len(valid_features), sample_size, replace=False)
+    sample_features = valid_features[sample_indices]
+
+    # Estimate bandwidth if not provided
+    if bandwidth is None:
+        print("   Estimating bandwidth for Mean Shift...")
+        bandwidth = estimate_bandwidth(sample_features, quantile=0.2, n_samples=2000)
+        print(f"   Estimated bandwidth: {bandwidth:.3f}")
+
+    # Mean Shift clustering
+    print(f"   Running Mean Shift (bandwidth={bandwidth:.3f})...")
+    ms = MeanShift(bandwidth=bandwidth, bin_seeding=True, n_jobs=-1)
+    ms.fit(sample_features)
+
+    # Predict all valid pixels
+    labels = np.full(len(features), -1)
+    labels[valid_mask] = ms.predict(valid_features)
+    labels = labels.reshape(h, w)
+
+    centroids = ms.cluster_centers_
+
+    # Denormalize centroids
+    centroids_denorm = centroids.copy()
+    centroids_denorm[:, 0:3] = centroids[:, 0:3] * 255.0
+    centroids_denorm[:, 3:] = centroids[:, 3:] / 2.0
+
+    # Identify soil cluster
+    soil_scores = []
+    for i, centroid_norm in enumerate(centroids):
+        r_val = centroid_norm[0] * 255
+        g_val = centroid_norm[1] * 255
+        b_val = centroid_norm[2] * 255
+
+        exg_val = centroid_norm[3] / 2.0
+        exgr_val = centroid_norm[4] / 2.0
+        vari_val = centroid_norm[6] / 2.0
+
+        rgb_soil_score = (r_val - g_val) + (r_val - b_val) + (g_val - b_val) * 0.5
+        veg_indices_score = -(exg_val + exgr_val + vari_val) * 100
+
+        brightness = (r_val + g_val + b_val) / 3
+        brightness_bonus = 30 if 80 < brightness < 180 else 0
+
+        soil_score = rgb_soil_score + veg_indices_score + brightness_bonus
+        soil_scores.append(soil_score)
+
+    soil_cluster = np.argmax(soil_scores)
+    bare_soil_mask = (labels == soil_cluster)
+
+    # Morphological cleanup
+    bare_soil_mask = morphology.binary_opening(bare_soil_mask, morphology.disk(2))
+    bare_soil_mask = morphology.binary_closing(bare_soil_mask, morphology.disk(3))
+
+    return bare_soil_mask, labels, centroids_denorm
+
+
+
 # ================================
 # GAP DETECTION
 # ================================
@@ -337,10 +814,10 @@ def analyze_drone_images_rgb_only(image_paths):
 
     return results
 
-def analyze_orthophoto():
-    """Main function for orthophoto gap detection"""
+def analyze_orthophoto(method='kmeans'):
+    """Main function for orthophoto gap detection with selectable clustering method"""
     print("\n" + "=" * 80)
-    print("ORTHOPHOTO GAP ANALYSIS")
+    print(f"ORTHOPHOTO GAP ANALYSIS - {method.upper()} METHOD")
     print("=" * 80)
 
     if not os.path.exists(Config.ORTHO_PATH):
@@ -370,40 +847,48 @@ def analyze_orthophoto():
     print("\n🧮 Calculating vegetation indices...")
     indices = calculate_vegetation_indices(r, g, b)
 
-    # Detect bare soil
-    print("🎯 Applying K-means clustering...")
-    bare_soil_mask, labels, centroids = detect_bare_soil_kmeans(r, g, b)
+    # Select clustering method based on user choice
+    print(f"\n🎯 Using {method.upper()} clustering method...")
 
-    print(f"\n📊 Cluster centroids (RGB):")
-    for i, centroid in enumerate(centroids):
-        print(f"  Cluster {i}: R={centroid[0]:.1f}, G={centroid[1]:.1f}, B={centroid[2]:.1f}")
+    clustering_methods = {
+        'kmeans': lambda: detect_bare_soil_kmeans(r, g, b, n_clusters=4),
+        'dbscan': lambda: detect_bare_soil_dbscan(r, g, b, eps=0.12, min_samples=30),
+        'slic': lambda: detect_bare_soil_slic(r, g, b, n_segments=1000, compactness=10),
+        'meanshift': lambda: detect_bare_soil_meanshift(r, g, b, bandwidth=None)
+    }
+
+    if method not in clustering_methods:
+        print(f"❌ Unknown method '{method}'. Using 'kmeans' as default.")
+        method = 'kmeans'
+
+    try:
+        bare_soil_mask, labels, centroids = clustering_methods[method]()
+        soil_percentage = np.sum(bare_soil_mask) / bare_soil_mask.size * 100
+        print(f"✅ {method.upper()}: {soil_percentage:.1f}% bare soil detected")
+
+        if len(centroids) > 0:
+            print(f"📊 Found {len(centroids)} clusters")
+    except Exception as e:
+        print(f"❌ {method.upper()} failed: {e}")
+        print("🔄 Falling back to K-means...")
+        method = 'kmeans'
+        bare_soil_mask, labels, centroids = detect_bare_soil_kmeans(r, g, b, n_clusters=4)
 
     # Create gap mask
-    approaches = ['exg_adaptive', 'exgr', 'vari', 'kmeans', 'combined_improved']
-    approach_results = {}
+    final_gap_mask = create_gap_mask(indices, bare_soil_mask, 'combined_improved')
 
-    for approach in approaches:
-        gap_mask = create_gap_mask(indices, bare_soil_mask, approach)
-        gap_percentage = np.sum(gap_mask) / gap_mask.size * 100
-        approach_results[approach] = {
-            'mask': gap_mask,
-            'percentage': gap_percentage
-        }
-        print(f"📈 {approach}: {gap_percentage:.1f}% potential gaps")
-
-    best_approach = 'combined_improved'
-    final_gap_mask = approach_results[best_approach]['mask']
-
-    print(f"\n✅ Using {best_approach} approach: {approach_results[best_approach]['percentage']:.1f}% gaps")
-
-    # Process each row
-    print(f"\n🔄 Processing {len(rows)} rows...")
     gaps = []
     row_summary = []
 
+    ensure_output_dir()
+
+    # Process gaps
+    print("\n" + "=" * 80)
+    print(f"PROCESSING GAPS - {method.upper()} METHOD")
+    print("=" * 80)
+
     for idx, row in rows.iterrows():
         try:
-            # Create mask for this row
             mask = rasterize(
                 [(row.geometry, 1)],
                 out_shape=(h, w),
@@ -415,7 +900,6 @@ def analyze_orthophoto():
             if np.sum(mask) == 0:
                 continue
 
-            # Find gaps in this row
             row_gaps_mask = np.logical_and(final_gap_mask, mask == 1)
             gap_labels = measure.label(row_gaps_mask, connectivity=2)
             props = measure.regionprops(gap_labels)
@@ -426,27 +910,22 @@ def analyze_orthophoto():
             valid_components = 0
 
             for prop in props:
-                # Filter by size
                 if prop.area < Config.MIN_GAP_AREA_PIXELS or prop.area > Config.MAX_GAP_AREA_PIXELS:
                     continue
 
                 valid_components += 1
 
-                # Calculate geographic coordinates
                 centroid_row, centroid_col = prop.centroid
                 gap_lon, gap_lat = pixel_to_geographic(centroid_row, centroid_col, src.transform)
 
-                # Bounding box
                 minr, minc, maxr, maxc = prop.bbox
                 lon_min, lat_max = src.transform * (minc, minr)
                 lon_max, lat_min = src.transform * (maxc, maxr)
 
-                # Calculate dimensions in meters
                 width_meters = calculate_distance_meters(lat_min, lon_min, lat_min, lon_max)
                 height_meters = calculate_distance_meters(lat_min, lon_min, lat_max, lon_min)
                 area_sqm = width_meters * height_meters
 
-                # Store gap info
                 poly = box(lon_min, lat_min, lon_max, lat_max)
                 gap_info = {
                     'row_id': row.row_id,
@@ -499,59 +978,48 @@ def analyze_orthophoto():
             continue
 
     # Save results
-    ensure_output_dir()
-
     if gaps:
-        # GeoJSON files
-        gdf = gpd.GeoDataFrame(gaps, crs=src.crs)
-        out_geojson = os.path.join(Config.OUTPUT_DIR, 'vineyard_gaps_detailed.geojson')
-        gdf.to_file(out_geojson, driver='GeoJSON')
+        print(f"\n💾 Saving {method.upper()} results...")
+        save_orthophoto_reports(gaps, row_summary, rows, src.crs, method)
+        print(f"   ✅ {method.upper()}: {len(gaps)} gaps saved")
 
-        # Gap centers
-        gap_points = [{
-            'row_id': gap['row_id'],
-            'gap_id': gap['gap_id'],
-            'geometry': gap['centroid_point'],
-            'lon': gap['centroid_lon'],
-            'lat': gap['centroid_lat'],
-            'pixels': gap['area_pixels'],
-            'area_sqm': gap['area_sqm']
-        } for gap in gaps]
+    # Save debug visualization
+    save_debug_visualization(r, g, b, bare_soil_mask, labels, indices,
+                             'combined_improved', {method: {
+            'mask': bare_soil_mask,
+            'labels': labels,
+            'centroids': centroids,
+            'percentage': soil_percentage
+        }}, method)
 
-        gdf_points = gpd.GeoDataFrame(gap_points, crs=src.crs)
-        out_points = os.path.join(Config.OUTPUT_DIR, 'vineyard_gap_centers.geojson')
-        gdf_points.to_file(out_points, driver='GeoJSON')
-
-        # Save reports
-        save_orthophoto_reports(gaps, row_summary, rows, src.crs)
-
-        # Save debug visualization
-        save_debug_visualization(r, g, b, final_gap_mask, labels, indices, best_approach)
-
-        print(f"\n🎉 FINAL RESULTS:")
-        print(f"📊 Total gaps detected: {len(gaps)}")
-        print(f"📈 Rows with gaps: {len(row_summary)}/{len(rows)}")
-        print(f"💾 Results saved in: {Config.OUTPUT_DIR}")
+    print(f"\n🎉 FINAL RESULTS ({method.upper()}):")
+    print(f"📊 Total gaps detected: {len(gaps)}")
+    print(f"💾 Results saved in: {Config.OUTPUT_DIR}")
 
     src.close()
 
     return {
+        'method': method,
         'gaps': gaps,
         'row_summary': row_summary,
-        'total_rows': len(rows)
+        'total_rows': len(rows),
+        'detected_gaps': len(gaps),
+        'total_gap_area_m2': sum(g['area_sqm'] for g in gaps) if gaps else 0,
+        'rows_analyzed': len(rows),
+        'rows_with_gaps': len(row_summary)
     }
 
-
-def save_orthophoto_reports(gaps, row_summary, rows, crs):
+def save_orthophoto_reports(gaps, row_summary, rows, crs, method_name='kmeans'):
     """Save detailed reports for orthophoto analysis"""
 
     # Text summary
-    summary_file = os.path.join(Config.OUTPUT_DIR, 'orthophoto_summary.txt')
+    summary_file = os.path.join(Config.OUTPUT_DIR, f'orthophoto_summary_{method_name}.txt')
     with open(summary_file, 'w', encoding='utf-8') as f:
         f.write("╔" + "═" * 80 + "╗\n")
-        f.write("║" + " " * 25 + "ORTHOPHOTO GAP ANALYSIS" + " " * 32 + "║\n")
+        f.write("║" + " " * 20 + f"ORTHOPHOTO GAP ANALYSIS - {method_name.upper()}" + " " * (39 - len(method_name)) + "║\n")
         f.write("╚" + "═" * 80 + "╝\n\n")
 
+        f.write(f"Method: {method_name.upper()}\n")
         f.write(f"Total rows analyzed: {len(rows)}\n")
         f.write(f"Rows with gaps: {len(row_summary)}\n")
         f.write(f"Total gaps detected: {len(gaps)}\n")
@@ -574,8 +1042,28 @@ def save_orthophoto_reports(gaps, row_summary, rows, crs):
                     f.write(
                         f"  Gap {gap['gap_id']}: {gap['lat']:.6f}°N, {gap['lon']:.6f}°E ({gap['area_sqm']:.1f} m²)\n")
 
+    # GeoJSON files
+    gdf = gpd.GeoDataFrame(gaps, crs=crs)
+    out_geojson = os.path.join(Config.OUTPUT_DIR, f'vineyard_gaps_detailed_{method_name}.geojson')
+    gdf.to_file(out_geojson, driver='GeoJSON')
+
+    # Gap centers
+    gap_points = [{
+        'row_id': gap['row_id'],
+        'gap_id': gap['gap_id'],
+        'geometry': gap['centroid_point'],
+        'lon': gap['centroid_lon'],
+        'lat': gap['centroid_lat'],
+        'pixels': gap['area_pixels'],
+        'area_sqm': gap['area_sqm']
+    } for gap in gaps]
+
+    gdf_points = gpd.GeoDataFrame(gap_points, crs=crs)
+    out_points = os.path.join(Config.OUTPUT_DIR, f'vineyard_gap_centers_{method_name}.geojson')
+    gdf_points.to_file(out_points, driver='GeoJSON')
+
     # CSV export
-    csv_file = os.path.join(Config.OUTPUT_DIR, 'orthophoto_gaps.csv')
+    csv_file = os.path.join(Config.OUTPUT_DIR, f'orthophoto_gaps_{method_name}.csv')
     with open(csv_file, 'w', encoding='utf-8') as f:
         f.write("row_id,gap_id,latitude,longitude,area_pixels,area_sqm,width_m,height_m,google_maps_link\n")
         for row_info in sorted(row_summary, key=lambda x: x['row_id']):
@@ -585,9 +1073,10 @@ def save_orthophoto_reports(gaps, row_summary, rows, crs):
                         f"{gap['pixels']},{gap['area_sqm']:.1f},{gap['width_m']:.1f},{gap['height_m']:.1f},{link}\n")
 
     # JSON export
-    json_file = os.path.join(Config.OUTPUT_DIR, 'orthophoto_gaps.json')
+    json_file = os.path.join(Config.OUTPUT_DIR, f'orthophoto_gaps_{method_name}.json')
     json_data = {
         'metadata': {
+            'method': method_name,
             'total_rows': len(rows),
             'rows_with_gaps': len(row_summary),
             'total_gaps': len(gaps),
@@ -617,14 +1106,20 @@ def save_orthophoto_reports(gaps, row_summary, rows, crs):
     with open(json_file, 'w', encoding='utf-8') as f:
         json.dump(json_data, f, indent=2, ensure_ascii=False)
 
+    print(f"   ✅ Saved: {out_geojson}")
+    print(f"   ✅ Saved: {out_points}")
+    print(f"   ✅ Saved: {summary_file}")
+    print(f"   ✅ Saved: {csv_file}")
+    print(f"   ✅ Saved: {json_file}")
 
-def save_debug_visualization(r, g, b, gap_mask, labels, indices, approach):
-    """Save debug visualization for orthophoto analysis - VERSIUNE EXTINSĂ"""
+def save_debug_visualization(r, g, b, gap_mask, labels, indices, approach, clustering_results=None, method='kmeans'):
+    """Save debug visualization with selected clustering method"""
+
     fig, axes = plt.subplots(3, 3, figsize=(20, 18))
 
     rgb_img = np.stack([r, g, b], axis=2)
 
-    # Rândul 1: RGB original, Gap detection, K-means clusters
+    # Row 1: RGB original, Gap detection, Clustering result
     axes[0, 0].imshow(rgb_img)
     axes[0, 0].set_title('Original RGB', fontsize=12, fontweight='bold')
     axes[0, 0].axis('off')
@@ -634,10 +1129,10 @@ def save_debug_visualization(r, g, b, gap_mask, labels, indices, approach):
     axes[0, 1].axis('off')
 
     axes[0, 2].imshow(labels, cmap='tab10')
-    axes[0, 2].set_title('K-means Clusters (RGB+Indici)', fontsize=12, fontweight='bold')
+    axes[0, 2].set_title(f'{method.upper()} Clustering Result', fontsize=12, fontweight='bold')
     axes[0, 2].axis('off')
 
-    # Rândul 2: Indici individuali
+    # Row 2: Vegetation indices
     im1 = axes[1, 0].imshow(indices['exg'], cmap='RdYlGn')
     axes[1, 0].set_title('Excess Green (ExG)', fontsize=11)
     axes[1, 0].axis('off')
@@ -653,7 +1148,7 @@ def save_debug_visualization(r, g, b, gap_mask, labels, indices, approach):
     axes[1, 2].axis('off')
     plt.colorbar(im3, ax=axes[1, 2], fraction=0.046)
 
-    # Rândul 3: Indici suplimentari + rezultat final
+    # Row 3: More indices + final result
     im4 = axes[2, 0].imshow(indices['ndi'], cmap='RdYlGn')
     axes[2, 0].set_title('NDI Index', fontsize=11)
     axes[2, 0].axis('off')
@@ -664,7 +1159,7 @@ def save_debug_visualization(r, g, b, gap_mask, labels, indices, approach):
     axes[2, 1].axis('off')
     plt.colorbar(im5, ax=axes[2, 1], fraction=0.046)
 
-    # Vegetație detectată final
+    # Final vegetation detection
     exg_mask = indices['exg'] < np.percentile(indices['exg'], 25)
     vari_mask = indices['vari'] < np.percentile(indices['vari'], 25)
     exgr_mask = indices['exgr'] < np.percentile(indices['exgr'], 20)
@@ -674,16 +1169,15 @@ def save_debug_visualization(r, g, b, gap_mask, labels, indices, approach):
     masked_rgb[~vegetation_mask] = [100, 100, 100]
 
     axes[2, 2].imshow(masked_rgb)
-    axes[2, 2].set_title('Vegetație Detectată Final\n(Combined Approach)',
-                         fontsize=11, fontweight='bold')
+    axes[2, 2].set_title('Final Vegetation Detection', fontsize=11, fontweight='bold')
     axes[2, 2].axis('off')
 
     plt.tight_layout()
-    debug_file = os.path.join(Config.OUTPUT_DIR, 'orthophoto_debug_extended.png')
+    debug_file = os.path.join(Config.OUTPUT_DIR, f'orthophoto_debug_{method}.png')
     plt.savefig(debug_file, dpi=150, bbox_inches='tight')
     plt.close()
 
-    print(f"✅ Salvat: {debug_file}")
+    print(f"✅ Saved: {debug_file}")
 
 def analyze_drone_images():
     """Analyze individual drone RGB/NIR image pairs"""
