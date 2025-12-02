@@ -397,6 +397,444 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 // ==================== HELPER FUNCTIONS ====================
 
+// ==================== IMAGE ANNOTATION ENDPOINT ====================
+
+app.post('/api/annotate-images', upload.fields([
+  { name: 'logFile', maxCount: 1 },
+  { name: 'images', maxCount: 100 }
+]), async (req, res) => {
+  console.log('\n' + '='.repeat(60));
+  console.log('📸 IMAGE ANNOTATION REQUEST');
+  console.log('='.repeat(60));
+
+  const djiLogBinary = path.join(__dirname, 'dji-log');
+  let logFilePath = null;
+  let csvOutputPath = null;
+  const uploadedImagePaths = [];
+
+  try {
+    if (!req.files?.logFile || !req.files?.images) {
+      return res.status(400).json({ 
+        error: 'Both log file and images are required' 
+      });
+    }
+
+    logFilePath = path.join(uploadDir, req.files.logFile[0].filename);
+    csvOutputPath = path.join(uploadDir, `flight_data_${Date.now()}.csv`);
+
+    console.log('📄 Log file:', logFilePath);
+    console.log('📸 Images count:', req.files.images.length);
+
+    // Store image paths
+    req.files.images.forEach(img => {
+      uploadedImagePaths.push({
+        path: path.join(uploadDir, img.filename),
+        originalName: img.originalname,
+        filename: img.filename
+      });
+    });
+
+    // Check if dji-log binary exists
+    if (!fs.existsSync(djiLogBinary)) {
+      throw new Error('dji-log binary not found');
+    }
+
+    // ============================================================
+    // STEP 1: Run dji-log to generate CSV with ALL columns
+    // ============================================================
+    console.log('\n🔧 Running dji-log command...');
+
+    const apiKey = process.env.DJI_API_KEY || '6a1613c4a95bea88c227b4b760e528e';
+
+    await new Promise((resolve, reject) => {
+      const djiLogProcess = spawn(djiLogBinary, [
+        '--api-key', apiKey,
+        logFilePath,
+        '--csv', csvOutputPath
+      ]);
+
+      let stderr = '';
+
+      djiLogProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      djiLogProcess.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`dji-log failed: ${stderr}`));
+        } else {
+          resolve();
+        }
+      });
+
+      djiLogProcess.on('error', (error) => {
+        reject(new Error(`Failed to run dji-log: ${error.message}`));
+      });
+    });
+
+    // ============================================================
+    // STEP 2: Parse CSV and extract ALL flight parameters
+    // ============================================================
+    console.log('\n📊 Parsing CSV for all flight parameters...');
+
+    const csvContent = fs.readFileSync(csvOutputPath, 'utf8');
+    const lines = csvContent.split('\n').filter(line => line.trim());
+
+    if (lines.length < 2) {
+      throw new Error('CSV file is empty');
+    }
+
+    // Parse header
+    const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    console.log(`📋 Found ${header.length} columns in CSV`);
+
+    // Find ALL relevant column indices
+    const columnIndices = {
+      datetime: findColumnIndex(header, ['datetime', 'time', 'OSD.flyTime']),
+      latitude: findColumnIndex(header, ['OSD.latitude', 'latitude']),
+      longitude: findColumnIndex(header, ['OSD.longitude', 'longitude']),
+      altitude: findColumnIndex(header, ['OSD.altitude', 'altitude']),
+      height: findColumnIndex(header, ['OSD.height', 'height', 'OSD.relativeHeight']),
+      pitch: findColumnIndex(header, ['OSD.pitch', 'pitch']),
+      roll: findColumnIndex(header, ['OSD.roll', 'roll']),
+      yaw: findColumnIndex(header, ['OSD.yaw', 'yaw']),
+      xSpeed: findColumnIndex(header, ['OSD.xSpeed', 'xSpeed', 'OSD.vpsNorthSpeed']),
+      ySpeed: findColumnIndex(header, ['OSD.ySpeed', 'ySpeed', 'OSD.vpsEastSpeed']),
+      zSpeed: findColumnIndex(header, ['OSD.zSpeed', 'zSpeed', 'OSD.vpsGroundSpeed']),
+      hSpeed: findColumnIndex(header, ['OSD.hSpeed', 'hSpeed', 'horizontalSpeed']),
+      gimbalPitch: findColumnIndex(header, ['GIMBAL.pitch', 'gimbal.pitch']),
+      gimbalRoll: findColumnIndex(header, ['GIMBAL.roll', 'gimbal.roll']),
+      gimbalYaw: findColumnIndex(header, ['GIMBAL.yaw', 'gimbal.yaw']),
+      batteryLevel: findColumnIndex(header, ['BATTERY.level', 'battery.level', 'OSD.batteryLevel']),
+      batteryVoltage: findColumnIndex(header, ['BATTERY.voltage', 'battery.voltage']),
+      gpsNum: findColumnIndex(header, ['OSD.gpsNum', 'gpsNum', 'GPS.numSatellites']),
+      flightMode: findColumnIndex(header, ['OSD.flycState', 'flightMode']),
+    };
+
+    console.log('🔍 Column indices found:', columnIndices);
+
+    // Parse all data rows
+    const flightData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      if (values.length === 0) continue;
+
+      const record = {};
+      header.forEach((col, idx) => {
+        let value = values[idx];
+        if (value && value !== '' && !isNaN(value)) {
+          value = parseFloat(value);
+        }
+        record[col] = value;
+      });
+
+      // Only add if has valid GPS
+      const lat = getValueByIndex(record, header, columnIndices.latitude);
+      const lon = getValueByIndex(record, header, columnIndices.longitude);
+
+      if (isValidCoordinate(lat, lon)) {
+        flightData.push({
+          timestamp: getValueByIndex(record, header, columnIndices.datetime),
+          latitude: lat,
+          longitude: lon,
+          altitude: getValueByIndex(record, header, columnIndices.altitude) || 0,
+          height: getValueByIndex(record, header, columnIndices.height) || 0,
+          pitch: getValueByIndex(record, header, columnIndices.pitch) || 0,
+          roll: getValueByIndex(record, header, columnIndices.roll) || 0,
+          yaw: getValueByIndex(record, header, columnIndices.yaw) || 0,
+          xSpeed: getValueByIndex(record, header, columnIndices.xSpeed) || 0,
+          ySpeed: getValueByIndex(record, header, columnIndices.ySpeed) || 0,
+          zSpeed: getValueByIndex(record, header, columnIndices.zSpeed) || 0,
+          hSpeed: getValueByIndex(record, header, columnIndices.hSpeed) || 0,
+          gimbalPitch: getValueByIndex(record, header, columnIndices.gimbalPitch) || 0,
+          gimbalRoll: getValueByIndex(record, header, columnIndices.gimbalRoll) || 0,
+          gimbalYaw: getValueByIndex(record, header, columnIndices.gimbalYaw) || 0,
+          batteryLevel: getValueByIndex(record, header, columnIndices.batteryLevel) || 0,
+          gpsNum: getValueByIndex(record, header, columnIndices.gpsNum) || 0,
+          flightMode: getValueByIndex(record, header, columnIndices.flightMode) || 'Unknown',
+          rawRecord: record
+        });
+      }
+    }
+
+    console.log(`✅ Parsed ${flightData.length} flight records with full parameters`);
+
+    // ============================================================
+    // STEP 3: Match images with flight data by timestamp
+    // ============================================================
+    console.log('\n🔗 Matching images with flight data...');
+
+    const annotatedImages = [];
+
+    for (const imgInfo of uploadedImagePaths) {
+      const imageAnnotation = {
+        imageName: imgInfo.originalName,
+        matchMethod: 'none',
+        flightData: null
+      };
+
+      // Try to extract timestamp from filename
+      // Common patterns: IMG_20251115_164300, DJI_0001_20251115164300, etc.
+      const timestampFromName = extractTimestampFromFilename(imgInfo.originalName);
+
+      if (timestampFromName && flightData.length > 0) {
+        // Find closest flight record by timestamp
+        const closest = findClosestFlightRecord(flightData, timestampFromName);
+        if (closest) {
+          imageAnnotation.matchMethod = 'timestamp';
+          imageAnnotation.flightData = closest;
+          imageAnnotation.timestampDiff = closest.timeDiff;
+        }
+      }
+
+      // If no timestamp match, try sequential matching (by index)
+      if (!imageAnnotation.flightData && flightData.length > 0) {
+        const imgIndex = uploadedImagePaths.indexOf(imgInfo);
+        const dataIndex = Math.floor((imgIndex / uploadedImagePaths.length) * flightData.length);
+        imageAnnotation.matchMethod = 'sequential';
+        imageAnnotation.flightData = flightData[Math.min(dataIndex, flightData.length - 1)];
+      }
+
+      annotatedImages.push(imageAnnotation);
+    }
+
+    // ============================================================
+    // STEP 4: Generate annotation output
+    // ============================================================
+    console.log('\n📝 Generating annotations...');
+
+    const annotations = annotatedImages.map(img => {
+      const fd = img.flightData || {};
+      return {
+        imageName: img.imageName,
+        matchMethod: img.matchMethod,
+        timestamp: fd.timestamp || null,
+        gps: {
+          latitude: round(fd.latitude, 8),
+          longitude: round(fd.longitude, 8),
+          altitude: round(fd.altitude, 2),
+          height: round(fd.height, 2),
+          satellites: fd.gpsNum || 0
+        },
+        orientation: {
+          pitch: round(fd.pitch, 2),
+          roll: round(fd.roll, 2),
+          yaw: round(fd.yaw, 2)
+        },
+        gimbal: {
+          pitch: round(fd.gimbalPitch, 2),
+          roll: round(fd.gimbalRoll, 2),
+          yaw: round(fd.gimbalYaw, 2)
+        },
+        speed: {
+          horizontal: round(fd.hSpeed, 2),
+          xSpeed: round(fd.xSpeed, 2),
+          ySpeed: round(fd.ySpeed, 2),
+          zSpeed: round(fd.zSpeed, 2)
+        },
+        battery: {
+          level: round(fd.batteryLevel, 1)
+        },
+        flightMode: fd.flightMode
+      };
+    });
+
+    // Generate CSV output
+    const csvOutput = generateAnnotationCSV(annotations);
+
+    // ============================================================
+    // STEP 5: Cleanup
+    // ============================================================
+    console.log('\n🧹 Cleaning up...');
+    try {
+      if (logFilePath && fs.existsSync(logFilePath)) fs.unlinkSync(logFilePath);
+      if (csvOutputPath && fs.existsSync(csvOutputPath)) fs.unlinkSync(csvOutputPath);
+      uploadedImagePaths.forEach(img => {
+        if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
+      });
+    } catch (e) {
+      console.error('Cleanup error:', e.message);
+    }
+
+    // ============================================================
+    // STEP 6: Return results
+    // ============================================================
+    console.log('\n✅ Annotation complete!');
+    console.log(`   Images annotated: ${annotations.length}`);
+
+    res.json({
+      success: true,
+      data: {
+        totalImages: annotations.length,
+        totalFlightRecords: flightData.length,
+        annotations: annotations,
+        csvData: csvOutput,
+        flightSummary: {
+          startTime: flightData[0]?.timestamp,
+          endTime: flightData[flightData.length - 1]?.timestamp,
+          recordCount: flightData.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ ANNOTATION ERROR:', error.message);
+
+    // Cleanup on error
+    try {
+      if (logFilePath && fs.existsSync(logFilePath)) fs.unlinkSync(logFilePath);
+      if (csvOutputPath && fs.existsSync(csvOutputPath)) fs.unlinkSync(csvOutputPath);
+      uploadedImagePaths.forEach(img => {
+        if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
+      });
+    } catch (e) {}
+
+    res.status(500).json({
+      error: 'Failed to annotate images',
+      details: error.message
+    });
+  }
+});
+
+// ==================== HELPER FUNCTIONS FOR ANNOTATION ====================
+
+function findColumnIndex(header, possibleNames) {
+  for (const name of possibleNames) {
+    const idx = header.findIndex(h => 
+      h.toLowerCase() === name.toLowerCase() || 
+      h.toLowerCase().includes(name.toLowerCase())
+    );
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+function getValueByIndex(record, header, index) {
+  if (index < 0 || index >= header.length) return null;
+  return record[header[index]];
+}
+
+function parseCSVLine(line) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      values.push(current.trim().replace(/^"|"$/g, ''));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  values.push(current.trim().replace(/^"|"$/g, ''));
+  return values;
+}
+
+function extractTimestampFromFilename(filename) {
+  // Pattern 1: IMG_20251115_164300.jpg -> 2025-11-15T16:43:00
+  let match = filename.match(/(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})/);
+  if (match) {
+    return new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`);
+  }
+
+  // Pattern 2: DJI_0001_2025-11-15_16-43-00.jpg
+  match = filename.match(/(\d{4})-(\d{2})-(\d{2})[_-](\d{2})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`);
+  }
+
+  // Pattern 3: Use file modification time from EXIF (would need additional library)
+  return null;
+}
+
+function findClosestFlightRecord(flightData, targetTime) {
+  let closest = null;
+  let minDiff = Infinity;
+
+  for (const record of flightData) {
+    if (!record.timestamp) continue;
+
+    const recordTime = new Date(record.timestamp);
+    if (isNaN(recordTime.getTime())) continue;
+
+    const diff = Math.abs(recordTime.getTime() - targetTime.getTime());
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = { ...record, timeDiff: diff };
+    }
+  }
+
+  // Only return if within 5 minutes (300000ms)
+  if (closest && minDiff < 300000) {
+    return closest;
+  }
+  return null;
+}
+
+function round(value, decimals) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+}
+
+function generateAnnotationCSV(annotations) {
+  const headers = [
+    'Image Name',
+    'Match Method',
+    'Timestamp',
+    'Latitude',
+    'Longitude',
+    'Altitude (m)',
+    'Height (m)',
+    'GPS Satellites',
+    'Pitch (°)',
+    'Roll (°)',
+    'Yaw (°)',
+    'Gimbal Pitch (°)',
+    'Gimbal Roll (°)',
+    'Gimbal Yaw (°)',
+    'Horizontal Speed (m/s)',
+    'X Speed (m/s)',
+    'Y Speed (m/s)',
+    'Z Speed (m/s)',
+    'Battery Level (%)',
+    'Flight Mode'
+  ];
+
+  let csv = headers.join(',') + '\n';
+
+  for (const ann of annotations) {
+    const row = [
+      `"${ann.imageName}"`,
+      ann.matchMethod,
+      ann.timestamp ? `"${ann.timestamp}"` : '',
+      ann.gps.latitude,
+      ann.gps.longitude,
+      ann.gps.altitude,
+      ann.gps.height,
+      ann.gps.satellites,
+      ann.orientation.pitch,
+      ann.orientation.roll,
+      ann.orientation.yaw,
+      ann.gimbal.pitch,
+      ann.gimbal.roll,
+      ann.gimbal.yaw,
+      ann.speed.horizontal,
+      ann.speed.xSpeed,
+      ann.speed.ySpeed,
+      ann.speed.zSpeed,
+      ann.battery.level,
+      `"${ann.flightMode}"`
+    ];
+    csv += row.join(',') + '\n';
+  }
+
+  return csv;
+}
+
 // Enhanced DJI Binary Log Format Parser
 async function parseDJIBinaryLog(fileBuffer) {
   try {

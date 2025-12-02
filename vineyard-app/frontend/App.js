@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -31,6 +32,7 @@ export default function App() {
   const [rowsGeojson, setRowsGeojson] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [clusteringMethod, setClusteringMethod] = useState('kmeans');
+  const [annotationImages, setAnnotationImages] = useState([]); // NEW: for image annotation
 
   const BACKEND_URL = `http://${backendIP}:${BACKEND_PORT}/api`;
 
@@ -102,6 +104,46 @@ export default function App() {
     }
   };
 
+  // NEW: Pick images for annotation
+  const pickAnnotationImages = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.tif,.tiff,.jpg,.jpeg,.png';
+        input.multiple = true;
+        input.onchange = (e) => {
+          const files = Array.from(e.target.files);
+          const processedFiles = files.map(file => ({
+            uri: URL.createObjectURL(file),
+            name: file.name,
+            type: file.type || 'image/tiff',
+            file: file // Keep reference to actual file for FormData
+          }));
+          setAnnotationImages(prev => [...prev, ...processedFiles]);
+        };
+        input.click();
+      } else {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsMultipleSelection: true,
+          quality: 1,
+        });
+
+        if (!result.canceled) {
+          setAnnotationImages(prev => [...prev, ...result.assets]);
+        }
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to pick images: ' + error.message);
+    }
+  };
+
+  // NEW: Remove annotation image
+  const removeAnnotationImage = (index) => {
+    setAnnotationImages(annotationImages.filter((_, i) => i !== index));
+  };
+
   // DOWNLOAD FUNCTIONS
   const downloadJSON = () => {
     const jsonStr = JSON.stringify(results.data, null, 2);
@@ -139,6 +181,9 @@ export default function App() {
       results.data.flightPath.forEach(point => {
         csvContent += `"${point.timestamp}",${point.latitude},${point.longitude},${point.altitude},${point.relativeAltitude}\n`;
       });
+    } else if (results.type === 'image-annotation') {
+      // Use the pre-generated CSV from backend
+      csvContent = results.data.csvData;
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -161,13 +206,34 @@ export default function App() {
 
     if (results.type === 'dji-log') {
       reportContent += '           DJI FLIGHT LOG ANALYSIS REPORT\n';
+    } else if (results.type === 'image-annotation') {
+      reportContent += '           IMAGE ANNOTATION REPORT\n';
     } else {
       reportContent += '           VINEYARD ANALYSIS REPORT\n';
     }
 
     reportContent += '╚══════════════════════════════════════════════════════════╝\n\n';
 
-    if (results.type === 'dji-log') {
+    if (results.type === 'image-annotation') {
+      reportContent += `Generated: ${timestamp}\n`;
+      reportContent += `Total Images Annotated: ${results.data.totalImages}\n`;
+      reportContent += `Flight Records Used: ${results.data.totalFlightRecords}\n\n`;
+
+      reportContent += '────────────────────────────────────────────────────────────\n';
+      reportContent += 'ANNOTATED IMAGES\n';
+      reportContent += '────────────────────────────────────────────────────────────\n\n';
+
+      results.data.annotations.forEach((ann, idx) => {
+        reportContent += `${idx + 1}. ${ann.imageName}\n`;
+        reportContent += `   Match Method: ${ann.matchMethod}\n`;
+        reportContent += `   GPS: ${ann.gps.latitude}, ${ann.gps.longitude}\n`;
+        reportContent += `   Altitude: ${ann.gps.altitude}m | Height: ${ann.gps.height}m\n`;
+        reportContent += `   Orientation: Pitch=${ann.orientation.pitch}° Roll=${ann.orientation.roll}° Yaw=${ann.orientation.yaw}°\n`;
+        reportContent += `   Gimbal: Pitch=${ann.gimbal.pitch}° Roll=${ann.gimbal.roll}° Yaw=${ann.gimbal.yaw}°\n`;
+        reportContent += `   Speed: H=${ann.speed.horizontal}m/s V=${ann.speed.zSpeed}m/s\n`;
+        reportContent += `   Battery: ${ann.battery.level}%\n\n`;
+      });
+    } else if (results.type === 'dji-log') {
       reportContent += `File Name: ${results.data.fileName}\n`;
       reportContent += `Generated: ${timestamp}\n\n`;
 
@@ -330,7 +396,19 @@ export default function App() {
       return;
     }
 
-    if (analysisType !== 'dji-log' && selectedImages.length === 0) {
+    // NEW: Validation for image annotation
+    if (analysisType === 'image-annotation') {
+      if (!selectedLogFile) {
+        showAlert('Error', 'Please select a DJI log file');
+        return;
+      }
+      if (annotationImages.length === 0) {
+        showAlert('Error', 'Please select at least one image to annotate');
+        return;
+      }
+    }
+
+    if (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && selectedImages.length === 0) {
       showAlert('Error', 'Please select at least one image');
       return;
     }
@@ -353,9 +431,68 @@ export default function App() {
       const formData = new FormData();
 
       // ===================================================================
-      // DJI LOG PARSING
+      // IMAGE ANNOTATION - NEW
       // ===================================================================
-      if (analysisType === 'dji-log') {
+      if (analysisType === 'image-annotation') {
+        console.log('📸 Processing image annotation...');
+        console.log('📄 Log file:', selectedLogFile.name);
+        console.log('🖼️ Images:', annotationImages.length);
+
+        // Add log file
+        if (Platform.OS === 'web') {
+          const response = await fetch(selectedLogFile.uri);
+          const blob = await response.blob();
+          formData.append('logFile', blob, selectedLogFile.name);
+        } else {
+          formData.append('logFile', {
+            uri: selectedLogFile.uri,
+            type: selectedLogFile.type || 'application/octet-stream',
+            name: selectedLogFile.name,
+          });
+        }
+
+        // Add images
+        for (let i = 0; i < annotationImages.length; i++) {
+          const img = annotationImages[i];
+
+          if (Platform.OS === 'web') {
+            // Use the file reference if available (from input element)
+            if (img.file) {
+              formData.append('images', img.file, img.name);
+            } else {
+              const response = await fetch(img.uri);
+              const blob = await response.blob();
+              formData.append('images', blob, img.name || `image_${i}.tif`);
+            }
+          } else {
+            formData.append('images', {
+              uri: img.uri,
+              type: img.type || 'image/tiff',
+              name: img.name || `image_${i}.tif`,
+            });
+          }
+        }
+
+        console.log('📡 Sending request to:', `${BACKEND_URL}/annotate-images`);
+
+        const response = await axios.post(
+          `${BACKEND_URL}/annotate-images`,
+          formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 600000, // 10 minutes for large batches
+          }
+        );
+
+        console.log('✅ Image annotation complete');
+        setResults({ type: 'image-annotation', data: response.data.data });
+        setSelectedLogFile(null);
+        setAnnotationImages([]);
+
+        // ===================================================================
+        // DJI LOG PARSING
+        // ===================================================================
+      } else if (analysisType === 'dji-log') {
         console.log('📄 Processing DJI log file...');
 
         if (Platform.OS === 'web') {
@@ -519,6 +656,7 @@ export default function App() {
     setSelectedImages([]);
     setSelectedLogFile(null);
     setRowsGeojson(null);
+    setAnnotationImages([]);
   };
 
   const BackendStatusBadge = () => (
@@ -602,6 +740,19 @@ export default function App() {
                 Parse DJI drone flight logs (.txt, .dat) to extract flight data and GPS coordinates
               </Text>
             </TouchableOpacity>
+
+            {/* NEW: Image Annotation Card */}
+            <TouchableOpacity
+              style={[styles.card, styles.cardAnnotation, backendStatus !== 'connected' && styles.cardDisabled]}
+              onPress={() => backendStatus === 'connected' && setAnalysisType('image-annotation')}
+              disabled={backendStatus !== 'connected'}
+            >
+              <Text style={styles.cardEmoji}>🏷️</Text>
+              <Text style={styles.cardTitle}>Image Annotation</Text>
+              <Text style={styles.cardDesc}>
+                Annotate drone images (.tif, .jpg) with flight metadata: GPS, altitude, pitch, roll, yaw, gimbal angles, speed etc.
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -644,15 +795,112 @@ export default function App() {
       <View style={styles.container}>
         <ScrollView>
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={() => setAnalysisType(null)}>
+            <TouchableOpacity onPress={() => { setAnalysisType(null); setAnnotationImages([]); }}>
               <Text style={styles.backBtn}>← Back</Text>
             </TouchableOpacity>
             <Text style={styles.topBarTitle}>
-              {analysisType === 'drone' ? '📷 Drone' : analysisType === 'orthophoto' ? '🗺️ Orthophoto' : '🚁 DJI Log'}
+              {analysisType === 'drone' ? '📷 Drone' :
+                analysisType === 'orthophoto' ? '🗺️ Orthophoto' :
+                  analysisType === 'image-annotation' ? '🏷️ Annotation' : '🚁 DJI Log'}
             </Text>
           </View>
 
-          {analysisType === 'dji-log' ? (
+          {/* NEW: Image Annotation UI */}
+          {analysisType === 'image-annotation' ? (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 1: Select DJI Log File</Text>
+                <Text style={styles.sectionDesc}>
+                  Upload the encrypted DJI flight log (.txt file)
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={pickDJILogFile}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>📄</Text>
+                <Text style={styles.uploadText}>
+                  {selectedLogFile ? `✓ ${selectedLogFile.name}` : 'Select Log File'}
+                </Text>
+              </TouchableOpacity>
+
+              {selectedLogFile && (
+                <View style={styles.geojsonInfo}>
+                  <Text style={styles.geojsonName}>
+                    📄 {selectedLogFile.name} ({Math.round((selectedLogFile.size || 0) / 1024)}KB)
+                  </Text>
+                  <TouchableOpacity onPress={() => setSelectedLogFile(null)}>
+                    <Text style={styles.removeIcon}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 2: Select Images to Annotate</Text>
+                <Text style={styles.sectionDesc}>
+                  Upload drone images (.tif, .jpg, .png) to annotate with flight data
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.uploadBtn, styles.uploadBtnSecondary]}
+                onPress={pickAnnotationImages}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>🖼️</Text>
+                <Text style={styles.uploadText}>
+                  {annotationImages.length === 0 ? 'Select Images' : `${annotationImages.length} Images Selected`}
+                </Text>
+              </TouchableOpacity>
+
+              {annotationImages.length > 0 && (
+                <View style={styles.imagesList}>
+                  <Text style={styles.imagesListTitle}>
+                    Selected Images ({annotationImages.length})
+                  </Text>
+                  <FlatList
+                    data={annotationImages}
+                    scrollEnabled={false}
+                    renderItem={({ item, index }) => {
+                      const isTif = item.name?.toLowerCase().endsWith('.tif') ||
+                        item.name?.toLowerCase().endsWith('.tiff');
+                      return (
+                        <View style={styles.imageRow}>
+                          {isTif ? (
+                            <View style={styles.tifPlaceholder}>
+                              <Text style={styles.tifIcon}>🗺️</Text>
+                            </View>
+                          ) : (
+                            <Image
+                              source={{ uri: item.uri }}
+                              style={styles.imageThumbnail}
+                            />
+                          )}
+                          <Text style={styles.imageName} numberOfLines={1}>
+                            {item.name || `Image ${index + 1}`}
+                          </Text>
+                          <TouchableOpacity onPress={() => removeAnnotationImage(index)}>
+                            <Text style={styles.removeIcon}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    }}
+                    keyExtractor={(_, idx) => idx.toString()}
+                  />
+                </View>
+              )}
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoEmoji}>💡</Text>
+                <Text style={styles.infoText}>
+                  Images will be matched with flight data based on timestamps extracted from filenames
+                  (e.g., IMG_20251115_164300.tif) or sequentially if no timestamp found.
+                </Text>
+              </View>
+            </>
+          ) : analysisType === 'dji-log' ? (
             <>
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Select DJI Log File</Text>
@@ -830,10 +1078,19 @@ export default function App() {
             <TouchableOpacity
               style={[
                 styles.analyzeBtn,
-                (loading || (analysisType === 'dji-log' ? !selectedLogFile : selectedImages.length === 0)) && styles.analyzeBtnDisabled
+                (loading ||
+                  (analysisType === 'dji-log' && !selectedLogFile) ||
+                  (analysisType === 'image-annotation' && (!selectedLogFile || annotationImages.length === 0)) ||
+                  (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && selectedImages.length === 0)
+                ) && styles.analyzeBtnDisabled
               ]}
               onPress={handleAnalyze}
-              disabled={loading || (analysisType === 'dji-log' ? !selectedLogFile : selectedImages.length === 0)}
+              disabled={
+                loading ||
+                (analysisType === 'dji-log' && !selectedLogFile) ||
+                (analysisType === 'image-annotation' && (!selectedLogFile || annotationImages.length === 0)) ||
+                (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && selectedImages.length === 0)
+              }
             >
               {loading ? (
                 <ActivityIndicator color="#fff" size="large" />
@@ -841,14 +1098,16 @@ export default function App() {
                 <>
                   <Text style={styles.analyzeBtnEmoji}>⚡</Text>
                   <Text style={styles.analyzeBtnText}>
-                    {analysisType === 'dji-log' ? 'Parse Log' : 'Analyze Now'}
+                    {analysisType === 'dji-log' ? 'Parse Log' :
+                      analysisType === 'image-annotation' ? 'Annotate Images' : 'Analyze Now'}
                   </Text>
                 </>
               )}
             </TouchableOpacity>
             {loading && (
               <Text style={styles.analyzingText}>
-                {analysisType === 'dji-log' ? 'Parsing flight log...' : 'Processing images...'}
+                {analysisType === 'dji-log' ? 'Parsing flight log...' :
+                  analysisType === 'image-annotation' ? 'Annotating images with flight data...' : 'Processing images...'}
               </Text>
             )}
           </View>
@@ -864,7 +1123,8 @@ export default function App() {
         <View style={styles.resultsHeader}>
           <Text style={styles.resultsEmoji}>✅</Text>
           <Text style={styles.resultsTitle}>
-            {results.type === 'dji-log' ? 'Parsing Complete' : 'Analysis Complete'}
+            {results.type === 'dji-log' ? 'Parsing Complete' :
+              results.type === 'image-annotation' ? 'Annotation Complete' : 'Analysis Complete'}
           </Text>
         </View>
 
@@ -890,7 +1150,103 @@ export default function App() {
         )}
 
         <View style={styles.resultsContent}>
-          {results.type === 'dji-log' ? (
+          {/* NEW: Image Annotation Results */}
+          {results.type === 'image-annotation' ? (
+            <>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricLabel}>Images Annotated</Text>
+                <Text style={styles.metricValue}>{results.data.totalImages}</Text>
+              </View>
+
+              <View style={styles.metricBox}>
+                <Text style={styles.metricLabel}>Flight Records Used</Text>
+                <Text style={styles.metricValue}>{results.data.totalFlightRecords}</Text>
+              </View>
+
+              <Text style={styles.detailsTitle}>Annotated Images</Text>
+
+              {results.data.annotations.map((ann, idx) => (
+                <View key={idx} style={styles.annotationCard}>
+                  <Text style={styles.annotationFilename}>{ann.imageName}</Text>
+                  <Text style={styles.annotationMatchBadge}>
+                    Match: {ann.matchMethod}
+                  </Text>
+
+                  <View style={styles.annotationSection}>
+                    <Text style={styles.annotationSectionTitle}>📍 GPS</Text>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Latitude:</Text>
+                      <Text style={styles.annotationValue}>{ann.gps.latitude}</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Longitude:</Text>
+                      <Text style={styles.annotationValue}>{ann.gps.longitude}</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Altitude:</Text>
+                      <Text style={styles.annotationValue}>{ann.gps.altitude}m</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Height:</Text>
+                      <Text style={styles.annotationValue}>{ann.gps.height}m</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.annotationSection}>
+                    <Text style={styles.annotationSectionTitle}>🎯 Orientation</Text>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Pitch:</Text>
+                      <Text style={styles.annotationValue}>{ann.orientation.pitch}°</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Roll:</Text>
+                      <Text style={styles.annotationValue}>{ann.orientation.roll}°</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Yaw:</Text>
+                      <Text style={styles.annotationValue}>{ann.orientation.yaw}°</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.annotationSection}>
+                    <Text style={styles.annotationSectionTitle}>📷 Gimbal</Text>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Pitch:</Text>
+                      <Text style={styles.annotationValue}>{ann.gimbal.pitch}°</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Roll:</Text>
+                      <Text style={styles.annotationValue}>{ann.gimbal.roll}°</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Yaw:</Text>
+                      <Text style={styles.annotationValue}>{ann.gimbal.yaw}°</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.annotationSection}>
+                    <Text style={styles.annotationSectionTitle}>🚀 Speed</Text>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Horizontal:</Text>
+                      <Text style={styles.annotationValue}>{ann.speed.horizontal} m/s</Text>
+                    </View>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Vertical (Z):</Text>
+                      <Text style={styles.annotationValue}>{ann.speed.zSpeed} m/s</Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.annotationSection, { borderBottomWidth: 0 }]}>
+                    <Text style={styles.annotationSectionTitle}>🔋 Battery</Text>
+                    <View style={styles.annotationRow}>
+                      <Text style={styles.annotationLabel}>Level:</Text>
+                      <Text style={styles.annotationValue}>{ann.battery.level}%</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : results.type === 'dji-log' ? (
             <>
               <View style={styles.metricBox}>
                 <Text style={styles.metricLabel}>File Name</Text>
@@ -1209,6 +1565,9 @@ const styles = StyleSheet.create({
   },
   cardDJI: {
     borderLeftColor: '#3498db',
+  },
+  cardAnnotation: {
+    borderLeftColor: '#9b59b6',
   },
   cardDisabled: {
     opacity: 0.5,
@@ -1671,5 +2030,79 @@ const styles = StyleSheet.create({
   },
   tifIcon: {
     fontSize: 24,
+  },
+  // NEW: Styles for info box
+  infoBox: {
+    marginHorizontal: 16,
+    backgroundColor: '#e8f4fd',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3498db',
+  },
+  infoEmoji: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#2c3e50',
+    lineHeight: 20,
+  },
+  // NEW: Styles for annotation cards
+  annotationCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#9b59b6',
+  },
+  annotationFilename: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1a472a',
+    marginBottom: 8,
+  },
+  annotationMatchBadge: {
+    fontSize: 11,
+    color: '#fff',
+    backgroundColor: '#9b59b6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  annotationSection: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  annotationSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  annotationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+  },
+  annotationLabel: {
+    fontSize: 12,
+    color: '#888',
+  },
+  annotationValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2c3e50',
   },
 });
