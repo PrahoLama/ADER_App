@@ -21,7 +21,7 @@ import FlightPathMap from './FlightPathMap';
 const BACKEND_PORT = 5000;
 
 export default function App() {
-  const [backendIP, setBackendIP] = useState('10.248.25.211');
+  const [backendIP, setBackendIP] = useState('10.71.43.211');
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedLogFile, setSelectedLogFile] = useState(null);
   const [analysisType, setAnalysisType] = useState(null);
@@ -1163,7 +1163,29 @@ export default function App() {
                 <Text style={styles.metricValue}>{results.data.totalFlightRecords}</Text>
               </View>
 
-              <Text style={styles.detailsTitle}>Annotated Images</Text>
+              {/* Download Annotated Images Section */}
+              {results.data.annotatedImages && results.data.annotatedImages.length > 0 && Platform.OS === 'web' && (
+                <View style={styles.downloadImagesSection}>
+                  <Text style={styles.downloadImagesTitle}>📥 Download Annotated Images</Text>
+                  {results.data.annotatedImages.map((img, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.downloadImageBtn}
+                      onPress={() => {
+                        const link = document.createElement('a');
+                        link.href = `http://${backendIP}:${BACKEND_PORT}${img.downloadUrl}`;
+                        link.download = img.originalName;
+                        link.click();
+                      }}
+                    >
+                      <Text style={styles.downloadImageIcon}>⬇️</Text>
+                      <Text style={styles.downloadImageText}>{img.originalName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.detailsTitle}>Annotation Details</Text>
 
               {results.data.annotations.map((ann, idx) => (
                 <View key={idx} style={styles.annotationCard}>
@@ -2104,5 +2126,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#2c3e50',
+  },
+  // Download annotated images styles
+  downloadImagesSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#27ae60',
+  },
+  downloadImagesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a472a',
+    marginBottom: 12,
+  },
+  downloadImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#27ae60',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  downloadImageIcon: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+  downloadImageText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
   },
 });
