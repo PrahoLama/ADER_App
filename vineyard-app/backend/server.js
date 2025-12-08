@@ -9,6 +9,7 @@ const axios = require('axios');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const readline = require('readline');
+const archiver = require('archiver');
 require('dotenv').config();
 
 // Optional: Install exif-parser for better timestamp extraction
@@ -49,6 +50,9 @@ const cacheDir = path.join(__dirname, 'cache');
   }
 });
 
+// Serve static files from uploads directory (for annotated images)
+app.use('/uploads', express.static(uploadDir));
+
 // Configure multer with increased limits
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
@@ -62,7 +66,7 @@ const upload = multer({
   storage,
   limits: {
     fileSize: 500 * 1024 * 1024, // 500MB
-    files: 150 // Support more files
+    files: 1050 // Support up to 1000 images + 50 log files
   }
 });
 
@@ -278,27 +282,34 @@ async function processImageBatch(images, flightData, batchSize = 5) {
 // ==================== OPTIMIZED IMAGE ANNOTATION ENDPOINT ====================
 
 app.post('/api/annotate-images', upload.fields([
-  { name: 'logFile', maxCount: 1 },
-  { name: 'images', maxCount: 150 }
+  { name: 'logFile', maxCount: 50 },  // Support multiple log files
+  { name: 'images', maxCount: 1000 }  // Support up to 1000 images
 ]), async (req, res) => {
   console.log('\n' + '='.repeat(60));
   console.log('📸 IMAGE ANNOTATION REQUEST - ULTRA OPTIMIZED VERSION');
   console.log('='.repeat(60));
 
   const djiLogBinary = path.join(__dirname, 'dji-log');
-  let logFilePath = null;
-  let csvOutputPath = null;
+  const uploadedLogFiles = [];
   const uploadedImagePaths = [];
 
   try {
     if (!req.files?.logFile || !req.files?.images) {
       return res.status(400).json({
-        error: 'Both log file and images are required'
+        error: 'Both log file(s) and images are required'
       });
     }
 
-    logFilePath = path.join(uploadDir, req.files.logFile[0].filename);
-    console.log('📄 Log file:', logFilePath);
+    // Store all log file paths
+    req.files.logFile.forEach(log => {
+      uploadedLogFiles.push({
+        path: path.join(uploadDir, log.filename),
+        originalName: log.originalname,
+        filename: log.filename
+      });
+    });
+
+    console.log('📄 Log files:', uploadedLogFiles.length);
     console.log('📸 Images count:', req.files.images.length);
 
     // Store image paths
@@ -316,102 +327,129 @@ app.post('/api/annotate-images', upload.fields([
     }
 
     // ============================================================
-    // STEP 1: Parse DJI Log with Caching
+    // STEP 1: Parse ALL DJI Logs with Caching
     // ============================================================
-    console.log('\n🔧 Parsing DJI log file...');
+    console.log('\n🔧 Parsing all DJI log files...');
 
-    const logBuffer = fs.readFileSync(logFilePath);
-    const logHash = crypto.createHash('md5').update(logBuffer).digest('hex');
-    csvOutputPath = path.join(cacheDir, `${logHash}.csv`);
+    const allFlightData = [];
+    const processedLogs = [];
 
-    if (fs.existsSync(csvOutputPath)) {
-      console.log('✅ Using cached flight data:', csvOutputPath);
-    } else {
-      console.log('🔄 No cache found, parsing log...');
-      const apiKey = process.env.DJI_API_KEY || '6a1613c4a95bea88c227b4b760e528e';
+    for (let i = 0; i < uploadedLogFiles.length; i++) {
+      const logFile = uploadedLogFiles[i];
+      console.log(`\n📄 [${i + 1}/${uploadedLogFiles.length}] Processing: ${logFile.originalName}`);
 
-      await new Promise((resolve, reject) => {
-        const djiLogProcess = spawn(djiLogBinary, [
-          '--api-key', apiKey,
-          logFilePath,
-          '--csv', csvOutputPath
-        ]);
+      const logBuffer = fs.readFileSync(logFile.path);
+      const logHash = crypto.createHash('md5').update(logBuffer).digest('hex');
+      const csvOutputPath = path.join(cacheDir, `${logHash}.csv`);
 
-        let stderr = '';
-        let stdout = '';
-        let lastOutput = Date.now();
+      if (fs.existsSync(csvOutputPath)) {
+        console.log('  ✅ Using cached flight data');
+      } else {
+        console.log('  🔄 No cache found, parsing log...');
+        const apiKey = process.env.DJI_API_KEY || '6a1613c4a95bea88c227b4b760e528e';
 
-        djiLogProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
-          console.log('dji-log stderr:', data.toString().trim());
-          lastOutput = Date.now();
-        });
+        await new Promise((resolve, reject) => {
+          const djiLogProcess = spawn(djiLogBinary, [
+            '--api-key', apiKey,
+            logFile.path,
+            '--csv', csvOutputPath
+          ]);
 
-        djiLogProcess.stdout.on('data', (data) => {
-          stdout += data.toString();
-          console.log('dji-log stdout:', data.toString().trim());
-          lastOutput = Date.now();
-        });
+          let stderr = '';
+          let stdout = '';
+          let lastOutput = Date.now();
 
-        // Monitor for hanging - kill if no output for 30 seconds
-        const checkInterval = setInterval(() => {
-          const timeSinceOutput = Date.now() - lastOutput;
-          if (timeSinceOutput > 30000) {
-            console.error('⚠️  DJI log parsing timeout - no output for 30 seconds');
+          djiLogProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+            lastOutput = Date.now();
+          });
+
+          djiLogProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+            lastOutput = Date.now();
+          });
+
+          // Monitor for hanging - kill if no output for 30 seconds
+          const checkInterval = setInterval(() => {
+            const timeSinceOutput = Date.now() - lastOutput;
+            if (timeSinceOutput > 30000) {
+              console.error('  ⚠️  Parsing timeout - no output for 30 seconds');
+              clearInterval(checkInterval);
+              djiLogProcess.kill('SIGKILL');
+              reject(new Error('DJI log parsing timeout - process hung'));
+            }
+          }, 5000);
+
+          djiLogProcess.on('close', (code) => {
             clearInterval(checkInterval);
-            djiLogProcess.kill('SIGKILL');
-            reject(new Error('DJI log parsing timeout - process hung'));
-          }
-        }, 5000);
+            if (code !== 0) {
+              reject(new Error(`dji-log failed with code ${code}: ${stderr || stdout}`));
+            } else {
+              console.log('  ✅ CSV generated and cached');
+              resolve();
+            }
+          });
 
-        djiLogProcess.on('close', (code) => {
-          clearInterval(checkInterval);
-          if (code !== 0) {
-            reject(new Error(`dji-log failed with code ${code}: ${stderr || stdout}`));
-          } else {
-            console.log('✅ CSV generated and cached');
-            resolve();
-          }
+          djiLogProcess.on('error', (error) => {
+            clearInterval(checkInterval);
+            reject(new Error(`Failed to run dji-log: ${error.message}`));
+          });
         });
+      }
 
-        djiLogProcess.on('error', (error) => {
-          clearInterval(checkInterval);
-          reject(new Error(`Failed to run dji-log: ${error.message}`));
-        });
+      // Verify CSV exists and is valid
+      if (!fs.existsSync(csvOutputPath)) {
+        console.warn(`  ⚠️  CSV not created for ${logFile.originalName}, skipping...`);
+        continue;
+      }
+
+      const csvStats = fs.statSync(csvOutputPath);
+      if (csvStats.size < 100) {
+        console.warn(`  ⚠️  CSV too small for ${logFile.originalName}, skipping...`);
+        continue;
+      }
+
+      console.log(`  ✅ CSV ready: ${(csvStats.size / 1024 / 1024).toFixed(2)} MB`);
+
+      // Parse CSV
+      console.log('  📊 Parsing flight data...');
+      const flightData = await parseCSVStreaming(csvOutputPath);
+
+      if (flightData.length === 0) {
+        console.warn(`  ⚠️  No valid GPS data in ${logFile.originalName}, skipping...`);
+        continue;
+      }
+
+      console.log(`  ✅ Parsed ${flightData.length} flight records with GPS data`);
+
+      allFlightData.push(...flightData);
+      processedLogs.push({
+        filename: logFile.originalName,
+        records: flightData.length
       });
     }
 
-    // Verify CSV exists and is valid
-    if (!fs.existsSync(csvOutputPath)) {
-      throw new Error('CSV file was not created by dji-log');
+    // Check if we have any valid GPS data from all logs
+    if (allFlightData.length === 0) {
+      throw new Error(`No valid GPS data found in any of the ${uploadedLogFiles.length} log files. Please ensure logs contain actual flight data with GPS coordinates.`);
     }
 
-    const csvStats = fs.statSync(csvOutputPath);
-    if (csvStats.size < 100) {
-      throw new Error('CSV file is too small - parsing may have failed');
-    }
-
-    console.log(`✅ CSV file ready: ${(csvStats.size / 1024 / 1024).toFixed(2)} MB`);
-
-    // ============================================================
-    // STEP 2: Parse CSV using streaming for efficiency
-    // ============================================================
-    console.log('\n📊 Parsing flight data from CSV (streaming)...');
-
-    const flightData = await parseCSVStreaming(csvOutputPath);
-
-    if (flightData.length === 0) {
-      throw new Error('No valid GPS data found in log file');
-    }
-
-    console.log(`✅ Parsed ${flightData.length} flight records with GPS data`);
+    console.log(`\n✅ Total flight records from ${processedLogs.length} logs: ${allFlightData.length}`);
+    
+    // Sort all flight data by timestamp for efficient searching
+    allFlightData.sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return timeA - timeB;
+    });
 
     // ============================================================
-    // STEP 3: Process images in optimized batches
+    // STEP 2: Process images in optimized batches with combined flight data
     // ============================================================
     console.log('\n📝 Creating annotated images (parallel batches)...');
+    console.log(`   Matching ${uploadedImagePaths.length} images against ${allFlightData.length} flight records...`);
 
-    const results = await processImageBatch(uploadedImagePaths, flightData, 5);
+    const results = await processImageBatch(uploadedImagePaths, allFlightData, 5);
 
     const annotations = results.map(r => r.annotation);
     const annotatedImagePaths = results.filter(r => r.imagePath).map(r => r.imagePath);
@@ -422,11 +460,13 @@ app.post('/api/annotate-images', upload.fields([
     const csvOutput = generateAnnotationCSV(annotations);
 
     // ============================================================
-    // STEP 4: Cleanup original uploaded files
+    // STEP 3: Cleanup original uploaded files
     // ============================================================
     console.log('\n🧹 Cleaning up original files...');
     try {
-      if (logFilePath && fs.existsSync(logFilePath)) fs.unlinkSync(logFilePath);
+      uploadedLogFiles.forEach(log => {
+        if (fs.existsSync(log.path)) fs.unlinkSync(log.path);
+      });
       uploadedImagePaths.forEach(img => {
         if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
       });
@@ -435,16 +475,21 @@ app.post('/api/annotate-images', upload.fields([
     }
 
     // ============================================================
-    // STEP 5: Return results
+    // STEP 4: Return results
     // ============================================================
     console.log('\n✅ Annotation complete!');
+    console.log(`   Processed ${processedLogs.length} log files`);
+    console.log(`   Annotated ${annotatedImagePaths.length}/${annotations.length} images`);
 
     res.json({
       success: true,
       data: {
         totalImages: annotations.length,
-        totalFlightRecords: flightData.length,
+        totalLogFiles: uploadedLogFiles.length,
+        processedLogFiles: processedLogs.length,
+        totalFlightRecords: allFlightData.length,
         successfulAnnotations: annotatedImagePaths.length,
+        logFileSummary: processedLogs,
         annotations: annotations,
         csvData: csvOutput,
         annotatedImages: annotatedImagePaths.map(img => ({
@@ -453,9 +498,9 @@ app.post('/api/annotate-images', upload.fields([
           filename: img.filename
         })),
         flightSummary: {
-          startTime: flightData[0]?.timestamp,
-          endTime: flightData[flightData.length - 1]?.timestamp,
-          recordCount: flightData.length
+          startTime: allFlightData[0]?.timestamp,
+          endTime: allFlightData[allFlightData.length - 1]?.timestamp,
+          recordCount: allFlightData.length
         }
       }
     });
@@ -868,7 +913,7 @@ app.post('/api/parse-dji-log', upload.single('logFile'), async (req, res) => {
 
 app.post('/api/analyze-drone', upload.array('images', 20), async (req, res) => {
   console.log('\n' + '='.repeat(60));
-  console.log('📥 DRONE ANALYSIS REQUEST');
+  console.log('📥 RGB DRONE IMAGE ANALYSIS REQUEST');
   console.log('='.repeat(60));
 
   try {
@@ -876,39 +921,85 @@ app.post('/api/analyze-drone', upload.array('images', 20), async (req, res) => {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    console.log('📸 Processing', req.files.length, 'images');
+    console.log('📸 Processing', req.files.length, 'drone images for vegetation health');
 
-    const tempScript = path.join(__dirname, 'temp_drone_analysis.py');
-    const scriptContent = `
-import sys
-import json
-import os
-sys.path.insert(0, '${__dirname.replace(/\\/g, '\\\\')}')
+    // Use Python from virtual environment
+    const pythonExecutable = path.join(__dirname, 'venv', 'bin', 'python3');
+    const pythonCommand = fs.existsSync(pythonExecutable) ? pythonExecutable : 'python3';
 
-from vine import analyze_drone_images_rgb_only
+    const results = [];
 
-image_paths = sys.argv[1:]
+    for (const img of req.files) {
+      const imagePath = img.path;
+      console.log(`\n🌿 Analyzing: ${img.originalname}`);
 
-try:
-    result = analyze_drone_images_rgb_only(image_paths)
-    print(json.dumps(result))
-except Exception as e:
-    print(json.dumps({"error": str(e)}))
-    sys.exit(1)
-`;
+      // Call Python RGB analyzer
+      const pythonProcess = spawn(pythonCommand, [
+        path.join(__dirname, 'rgb_analyzer.py'),
+        '--image', imagePath,
+        '--output', uploadDir,
+        '--json'
+      ]);
 
-    fs.writeFileSync(tempScript, scriptContent);
+      let pythonOutput = '';
+      let pythonError = '';
 
-    const filePaths = req.files.map(f => path.join(uploadDir, f.filename));
-    const result = await runPythonScript(tempScript, filePaths);
+      pythonProcess.stdout.on('data', (data) => {
+        pythonOutput += data.toString();
+      });
 
-    fs.unlinkSync(tempScript);
-    filePaths.forEach(f => {
-      try { fs.unlinkSync(f); } catch (err) {}
+      pythonProcess.stderr.on('data', (data) => {
+        pythonError += data.toString();
+        console.log('   ', data.toString().trim());
+      });
+
+      await new Promise((resolve, reject) => {
+        pythonProcess.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const analysis = JSON.parse(pythonOutput)[0];
+              
+              // Fix visualization path to be relative
+              if (analysis.visualization) {
+                analysis.visualization = `uploads/${path.basename(analysis.visualization)}`;
+              }
+
+              results.push({
+                image: img.originalname,
+                analysis: analysis,
+                visualization_image: analysis.visualization
+              });
+
+              console.log(`✅ Analysis complete - Vegetation: ${analysis.health_analysis.vegetation_cover}%`);
+              resolve();
+            } catch (err) {
+              console.error('❌ Failed to parse analysis output:', err.message);
+              results.push({
+                image: img.originalname,
+                error: 'Failed to parse analysis results',
+                details: err.message
+              });
+              resolve();
+            }
+          } else {
+            console.error(`❌ Analysis failed with code ${code}`);
+            results.push({
+              image: img.originalname,
+              error: 'RGB analysis failed',
+              details: pythonError
+            });
+            resolve();
+          }
+        });
+      });
+    }
+
+    console.log('\n✅ All images analyzed');
+    res.json({ 
+      success: true, 
+      processed: req.files.length,
+      results: results 
     });
-
-    console.log('✅ Analysis complete');
-    res.json({ success: true, data: result });
 
   } catch (error) {
     console.error('❌ ERROR:', error);
@@ -1358,25 +1449,495 @@ app.get('/api/download/:filename', (req, res) => {
       }
     } else {
       console.log('✅ File downloaded:', filename);
-      setTimeout(() => {
-        try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log('🧹 Cleaned up downloaded file:', filename);
-          }
-        } catch (e) {
-          console.error('Cleanup error:', e.message);
-        }
-      }, 60000);
     }
   });
+});
+
+// ==================== DOWNLOAD ALL AS ZIP ====================
+app.post('/api/download-zip', async (req, res) => {
+  const { filenames } = req.body;
+  
+  if (!filenames || filenames.length === 0) {
+    return res.status(400).json({ error: 'No files specified' });
+  }
+
+  console.log(`📦 Creating ZIP with ${filenames.length} files...`);
+
+  try {
+    const archive = archiver('zip', {
+      zlib: { level: 6 } // Compression level
+    });
+
+    res.attachment('annotated_images.zip');
+    archive.pipe(res);
+
+    // Add each file to the archive
+    for (const filename of filenames) {
+      const filePath = path.join(uploadDir, filename);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: filename });
+      }
+    }
+
+    await archive.finalize();
+    console.log('✅ ZIP created and sent');
+
+  } catch (error) {
+    console.error('❌ ZIP creation error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create ZIP' });
+    }
+  }
+});
+
+// ==================== YOLO AUTO-ANNOTATION ====================
+
+// Create annotations directory
+const annotationsDir = path.join(__dirname, 'annotations');
+if (!fs.existsSync(annotationsDir)) {
+  fs.mkdirSync(annotationsDir, { recursive: true });
+}
+
+/**
+ * Auto-detect objects using YOLO
+ * POST /api/auto-annotate
+ * Body: { images: [file], industry: 'agriculture'|'rescue'|'general', confidence: 0.25 }
+ */
+app.post('/api/auto-annotate', async (req, res) => {
+  console.log('\n' + '='.repeat(60));
+  console.log('🤖 AUTO-ANNOTATION REQUEST WITH YOLO');
+  console.log('='.repeat(60));
+
+  const { imagePaths, industry, confidence } = req.body;
+  
+  if (!imagePaths || imagePaths.length === 0) {
+    return res.status(400).json({ error: 'No image paths provided' });
+  }
+
+  console.log(`📸 Images to process: ${imagePaths.length}`);
+  console.log(`🏭 Industry mode: ${industry || 'general'}`);
+  console.log(`🎯 Confidence threshold: ${confidence || 0.25}`);
+
+  try {
+    const results = [];
+    
+    for (const filename of imagePaths) {
+      const imagePath = path.join(uploadDir, filename);
+      
+      if (!fs.existsSync(imagePath)) {
+        console.warn(`⚠️  Image not found: ${filename}`);
+        continue;
+      }
+      
+      const outputFilename = `yolo_${filename}`;
+      const outputPath = path.join(uploadDir, outputFilename);
+      
+      console.log(`\n🔍 Processing: ${filename}`);
+      console.log(`   📍 Using GPS-annotated image: ${path.basename(imagePath)}`);
+      
+      // Use Python from virtual environment
+      const pythonExecutable = path.join(__dirname, 'venv', 'bin', 'python3');
+      const pythonCommand = fs.existsSync(pythonExecutable) ? pythonExecutable : 'python3';
+      
+      console.log(`   🐍 Using Python: ${pythonCommand}`);
+      
+      // Call Python YOLO detector
+      const pythonProcess = spawn(pythonCommand, [
+        path.join(__dirname, 'yolo_detector.py'),
+        '--image', imagePath,
+        '--industry', industry || 'general',
+        '--confidence', (confidence || 0.25).toString(),
+        '--output', uploadDir,
+        '--json'
+      ]);
+
+      let pythonOutput = '';
+      let pythonError = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        pythonOutput += data.toString();
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        pythonError += data.toString();
+        console.log('   ', data.toString().trim());
+      });
+
+      await new Promise((resolve, reject) => {
+        pythonProcess.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const detection = JSON.parse(pythonOutput)[0];
+              
+              // Save annotations to JSON
+              const annotationFile = path.join(
+                annotationsDir, 
+                `${path.parse(filename).name}_annotations.json`
+              );
+              
+              const annotationData = {
+                image: filename,
+                image_path: imagePath,
+                timestamp: new Date().toISOString(),
+                industry: industry || 'general',
+                confidence_threshold: confidence || 0.25,
+                detections: detection.detections,
+                detection_count: detection.detection_count,
+                manual_corrections: [],
+                status: 'auto_annotated'
+              };
+              
+              fs.writeFileSync(annotationFile, JSON.stringify(annotationData, null, 2));
+              
+              // Extract just the filename from the full path returned by Python
+              const annotatedImagePath = detection.annotated_image 
+                ? `uploads/${path.basename(detection.annotated_image)}`
+                : null;
+              
+              results.push({
+                image: filename,
+                annotations: annotationData,
+                annotated_image: annotatedImagePath
+              });
+              
+              console.log(`✅ Detected ${detection.detection_count} objects`);
+              resolve();
+            } catch (err) {
+              console.error('❌ Failed to parse YOLO output:', err.message);
+              results.push({
+                image: filename,
+                error: 'Failed to parse detection results',
+                details: err.message
+              });
+              resolve();
+            }
+          } else {
+            console.error(`❌ YOLO process failed with code ${code}`);
+            results.push({
+              image: filename,
+              error: 'YOLO detection failed',
+              details: pythonError
+            });
+            resolve();
+          }
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      processed: imagePaths.length,
+      industry: industry,
+      confidence: confidence,
+      results: results
+    });
+
+  } catch (err) {
+    console.error('❌ Auto-annotation error:', err);
+    res.status(500).json({
+      error: 'Auto-annotation failed',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * Generate comprehensive training dataset JSON
+ * POST /api/generate-training-dataset
+ * Body: { yoloResults: [], gpsAnnotations: [], totalImages: number, industry: string, confidence: number }
+ */
+app.post('/api/generate-training-dataset', async (req, res) => {
+  console.log('\n' + '='.repeat(60));
+  console.log('📦 TRAINING DATASET JSON GENERATION');
+  console.log('='.repeat(60));
+
+  const { yoloResults, gpsAnnotations, totalImages, industry, confidence } = req.body;
+
+  if (!yoloResults || !gpsAnnotations) {
+    return res.status(400).json({ error: 'Missing YOLO results or GPS annotations' });
+  }
+
+  console.log(`📸 Total images: ${totalImages}`);
+  console.log(`🤖 YOLO detections: ${yoloResults.length}`);
+  console.log(`📍 GPS annotations: ${gpsAnnotations.length}`);
+
+  try {
+    const sizeOf = require('image-size');
+    
+    // Build class list
+    const classSet = new Set();
+    yoloResults.forEach(result => {
+      if (result.detections) {
+        result.detections.forEach(det => classSet.add(det.label));
+      }
+    });
+    const classes = Array.from(classSet).sort();
+
+    // Count total objects
+    let totalObjects = 0;
+    yoloResults.forEach(result => {
+      if (result.detections) totalObjects += result.detections.length;
+    });
+
+    // Build images array
+    const images = [];
+    let imageIdCounter = 1;
+    let objectIdCounter = 1;
+
+    for (const yoloResult of yoloResults) {
+      const filename = yoloResult.image;
+      const imagePath = path.join(uploadDir, filename);
+
+      // Get image dimensions
+      let width = 0, height = 0;
+      if (fs.existsSync(imagePath)) {
+        try {
+          const dimensions = sizeOf(imagePath);
+          width = dimensions.width;
+          height = dimensions.height;
+        } catch (err) {
+          console.warn(`⚠️ Could not read dimensions for ${filename}`);
+        }
+      }
+
+      // Find GPS annotation for this image
+      const gpsAnnotation = gpsAnnotations.find(ann => ann.filename === filename);
+
+      // Build DJI metadata
+      let djiMetadata = null;
+      if (gpsAnnotation && gpsAnnotation.metadata) {
+        const meta = gpsAnnotation.metadata;
+        djiMetadata = {
+          gps: {
+            latitude: meta.latitude || null,
+            longitude: meta.longitude || null,
+            altitude: meta.altitude || null,
+            height: meta.height || null
+          },
+          orientation: {
+            pitch: meta.pitch || null,
+            roll: meta.roll || null,
+            yaw: meta.yaw || null
+          },
+          gimbal: {
+            pitch: meta.gimbalPitch || null,
+            roll: meta.gimbalRoll || null,
+            yaw: meta.gimbalYaw || null
+          },
+          speed: {
+            horizontal: meta.horizontalSpeed || null,
+            vertical: meta.verticalSpeed || null
+          },
+          battery: {
+            level: meta.batteryLevel || null
+          },
+          timestamp: meta.timestamp || null
+        };
+      }
+
+      // Build objects array
+      const objects = [];
+      if (yoloResult.detections) {
+        yoloResult.detections.forEach(det => {
+          objects.push({
+            object_id: objectIdCounter++,
+            label: det.label,
+            confidence: det.confidence,
+            bbox: {
+              xmin: det.bbox.xmin,
+              ymin: det.bbox.ymin,
+              xmax: det.bbox.xmax,
+              ymax: det.bbox.ymax
+            }
+          });
+        });
+      }
+
+      images.push({
+        image_id: imageIdCounter++,
+        filename: filename,
+        width: width,
+        height: height,
+        dji_metadata: djiMetadata,
+        objects: objects
+      });
+    }
+
+    const dataset = {
+      dataset_name: "DJI_Annotated_Dataset",
+      version: "1.0",
+      description: "Comprehensive training dataset with DJI flight metadata and YOLO object detections",
+      generation_params: {
+        industry: industry || 'general',
+        confidence_threshold: confidence || 0.25,
+        generated_at: new Date().toISOString()
+      },
+      image_stats: {
+        total_images: totalImages,
+        total_objects: totalObjects,
+        classes: classes
+      },
+      images: images
+    };
+
+    console.log(`✅ Generated training dataset: ${totalImages} images, ${totalObjects} objects`);
+    console.log(`📊 Classes: ${classes.join(', ')}`);
+
+    res.json({
+      success: true,
+      dataset: dataset
+    });
+
+  } catch (err) {
+    console.error('❌ Training dataset generation error:', err);
+    res.status(500).json({
+      error: 'Failed to generate training dataset',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * Get saved annotations for an image
+ * GET /api/annotations/:imageName
+ */
+app.get('/api/annotations/:imageName', (req, res) => {
+  const imageName = req.params.imageName;
+  const baseName = path.parse(imageName).name;
+  const annotationFile = path.join(annotationsDir, `${baseName}_annotations.json`);
+
+  if (!fs.existsSync(annotationFile)) {
+    return res.status(404).json({ error: 'Annotations not found' });
+  }
+
+  try {
+    const annotations = JSON.parse(fs.readFileSync(annotationFile, 'utf8'));
+    res.json(annotations);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read annotations', details: err.message });
+  }
+});
+
+/**
+ * Update annotations with manual corrections
+ * POST /api/annotations/:imageName/update
+ * Body: { detections: [...], manual_corrections: [...] }
+ */
+app.post('/api/annotations/:imageName/update', express.json(), (req, res) => {
+  const imageName = req.params.imageName;
+  const baseName = path.parse(imageName).name;
+  const annotationFile = path.join(annotationsDir, `${baseName}_annotations.json`);
+
+  if (!fs.existsSync(annotationFile)) {
+    return res.status(404).json({ error: 'Annotations not found' });
+  }
+
+  try {
+    const annotations = JSON.parse(fs.readFileSync(annotationFile, 'utf8'));
+    
+    // Update with manual corrections
+    if (req.body.detections) {
+      annotations.detections = req.body.detections;
+    }
+    if (req.body.manual_corrections) {
+      annotations.manual_corrections = req.body.manual_corrections;
+    }
+    
+    annotations.last_updated = new Date().toISOString();
+    annotations.status = 'manually_reviewed';
+    
+    fs.writeFileSync(annotationFile, JSON.stringify(annotations, null, 2));
+    
+    console.log(`✅ Updated annotations for: ${imageName}`);
+    res.json({ success: true, annotations });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update annotations', details: err.message });
+  }
+});
+
+/**
+ * Export annotations in YOLO/COCO format
+ * GET /api/export-annotations?format=yolo|coco
+ */
+app.get('/api/export-annotations', (req, res) => {
+  const format = req.query.format || 'yolo';
+  
+  try {
+    const annotationFiles = fs.readdirSync(annotationsDir)
+      .filter(f => f.endsWith('_annotations.json'));
+    
+    const allAnnotations = annotationFiles.map(f => {
+      return JSON.parse(fs.readFileSync(path.join(annotationsDir, f), 'utf8'));
+    });
+    
+    if (format === 'coco') {
+      // COCO format export
+      const cocoData = {
+        info: {
+          description: "ADER Multi-Industry Dataset",
+          version: "1.0",
+          year: new Date().getFullYear(),
+          date_created: new Date().toISOString()
+        },
+        images: [],
+        annotations: [],
+        categories: []
+      };
+      
+      const categorySet = new Set();
+      let annotationId = 1;
+      
+      allAnnotations.forEach((ann, imgIdx) => {
+        cocoData.images.push({
+          id: imgIdx + 1,
+          file_name: ann.image,
+          width: 4000,  // Adjust based on actual image
+          height: 3000
+        });
+        
+        ann.detections.forEach(det => {
+          categorySet.add(det.class);
+          
+          cocoData.annotations.push({
+            id: annotationId++,
+            image_id: imgIdx + 1,
+            category_id: det.class_id,
+            bbox: [det.bbox.x1, det.bbox.y1, det.bbox.width, det.bbox.height],
+            area: det.bbox.width * det.bbox.height,
+            iscrowd: 0
+          });
+        });
+      });
+      
+      Array.from(categorySet).forEach((cat, idx) => {
+        cocoData.categories.push({ id: idx, name: cat });
+      });
+      
+      const exportPath = path.join(annotationsDir, 'annotations_coco.json');
+      fs.writeFileSync(exportPath, JSON.stringify(cocoData, null, 2));
+      res.download(exportPath);
+      
+    } else {
+      // YOLO format export (txt files)
+      const zipPath = path.join(annotationsDir, 'annotations_yolo.zip');
+      // For simplicity, return JSON; full implementation would create .txt files
+      res.json({
+        format: 'yolo',
+        annotations: allAnnotations,
+        message: 'Download individual .txt files or use COCO format'
+      });
+    }
+    
+  } catch (err) {
+    res.status(500).json({ error: 'Export failed', details: err.message });
+  }
 });
 
 // ==================== START SERVER ====================
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log('\n' + '='.repeat(60));
-  console.log('✅ SERVER RUNNING - ULTRA OPTIMIZED VERSION');
+  console.log('✅ SERVER RUNNING - ULTRA OPTIMIZED VERSION + YOLO');
   console.log('='.repeat(60));
   console.log(`🌐 Local:    http://localhost:${PORT}`);
   console.log(`🌐 Network:  http://0.0.0.0:${PORT}`);
@@ -1387,5 +1948,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('  ✓ Process timeout monitoring (30s)');
   console.log('  ✓ Smart caching system');
   console.log('  ✓ Optimized image compression');
+  console.log('  ✓ YOLO auto-annotation (agriculture/rescue/general)');
+  console.log('  ✓ Manual annotation correction system');
   console.log('\n💡 Waiting for requests...\n');
 });

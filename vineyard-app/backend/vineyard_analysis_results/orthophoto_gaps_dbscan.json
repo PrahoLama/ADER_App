@@ -1,0 +1,2107 @@
+{
+  "metadata": {
+    "method": "dbscan",
+    "total_rows": 22,
+    "rows_with_gaps": 22,
+    "total_gaps": 151,
+    "min_area_pixels": 15,
+    "crs": "EPSG:4326"
+  },
+  "rows": [
+    {
+      "row_id": 1,
+      "gap_count": 1,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.183679135173485,
+            "longitude": 23.859947597722456
+          },
+          "dimensions": {
+            "area_pixels": 456.0,
+            "area_sqm": 435.0585668677509,
+            "width_m": 19.241201386284562,
+            "height_m": 22.610779760242398
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 2,
+      "gap_count": 2,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.183772366308425,
+            "longitude": 23.85986757570187
+          },
+          "dimensions": {
+            "area_pixels": 630.0,
+            "area_sqm": 805.203117228438,
+            "width_m": 26.583210399417382,
+            "height_m": 30.289912509818055
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.183604523956916,
+            "longitude": 23.860080511010075
+          },
+          "dimensions": {
+            "area_pixels": 125.0,
+            "area_sqm": 31.8239570906672,
+            "width_m": 5.274452134553231,
+            "height_m": 6.033604302177031
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 3,
+      "gap_count": 3,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18380081249246,
+            "longitude": 23.859873604758217
+          },
+          "dimensions": {
+            "area_pixels": 636.0,
+            "area_sqm": 832.4980178768984,
+            "width_m": 26.8363715243787,
+            "height_m": 31.02125848573234
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18365282656397,
+            "longitude": 23.86005858716882
+          },
+          "dimensions": {
+            "area_pixels": 19.0,
+            "area_sqm": 0.732914425615415,
+            "width_m": 0.801715685446848,
+            "height_m": 0.914182470069691
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18361709308575,
+            "longitude": 23.86010325699538
+          },
+          "dimensions": {
+            "area_pixels": 138.0,
+            "area_sqm": 39.39226602894639,
+            "width_m": 5.822994169284846,
+            "height_m": 6.764950278798643
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 4,
+      "gap_count": 7,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18393566098068,
+            "longitude": 23.859744254094803
+          },
+          "dimensions": {
+            "area_pixels": 130.0,
+            "area_sqm": 35.102578705367115,
+            "width_m": 5.485397352220557,
+            "height_m": 6.399277290487837
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.183827262348,
+            "longitude": 23.859878811670516
+          },
+          "dimensions": {
+            "area_pixels": 357.0,
+            "area_sqm": 264.4041854283685,
+            "width_m": 15.063788438951853,
+            "height_m": 17.552303426186853
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18373563672524,
+            "longitude": 23.859992541597034
+          },
+          "dimensions": {
+            "area_pixels": 46.0,
+            "area_sqm": 4.376907408057509,
+            "width_m": 1.9409931605781798,
+            "height_m": 2.2549834265019886
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18371113213099,
+            "longitude": 23.860022960926777
+          },
+          "dimensions": {
+            "area_pixels": 37.0,
+            "area_sqm": 2.854505998099844,
+            "width_m": 1.5612342675320805,
+            "height_m": 1.828364940139382
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18368398810709,
+            "longitude": 23.86005666883271
+          },
+          "dimensions": {
+            "area_pixels": 48.0,
+            "area_sqm": 4.814088382934493,
+            "width_m": 2.0253860856717734,
+            "height_m": 2.3768744226055905
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.183637619303035,
+            "longitude": 23.860114218916006
+          },
+          "dimensions": {
+            "area_pixels": 114.0,
+            "area_sqm": 26.971268606099013,
+            "width_m": 4.810297277126062,
+            "height_m": 5.606985816521748
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.1836064640879,
+            "longitude": 23.860152859686224
+          },
+          "dimensions": {
+            "area_pixels": 17.0,
+            "area_sqm": 0.6120483486133462,
+            "width_m": 0.7173251613392501,
+            "height_m": 0.8532369720178901
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 5,
+      "gap_count": 7,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18395215276865,
+            "longitude": 23.859762067215822
+          },
+          "dimensions": {
+            "area_pixels": 125.0,
+            "area_sqm": 32.466660422220066,
+            "width_m": 5.2744188483563175,
+            "height_m": 6.155495298280633
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18388933000153,
+            "longitude": 23.859840170900302
+          },
+          "dimensions": {
+            "area_pixels": 150.0,
+            "area_sqm": 46.28915722647327,
+            "width_m": 6.329310442178651,
+            "height_m": 7.313459759850205
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18382452570605,
+            "longitude": 23.859920741016918
+          },
+          "dimensions": {
+            "area_pixels": 136.0,
+            "area_sqm": 38.471476243198516,
+            "width_m": 5.73858126618351,
+            "height_m": 6.704004780746842
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18375992670638,
+            "longitude": 23.86000103708552
+          },
+          "dimensions": {
+            "area_pixels": 151.0,
+            "area_sqm": 47.374492746685476,
+            "width_m": 6.371520900240509,
+            "height_m": 7.43535075666113
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.183715622709286,
+            "longitude": 23.86005612073668
+          },
+          "dimensions": {
+            "area_pixels": 42.0,
+            "area_sqm": 3.672283171327463,
+            "width_m": 1.772211765129195,
+            "height_m": 2.0721469316392627
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18369291280313,
+            "longitude": 23.860084347682296
+          },
+          "dimensions": {
+            "area_pixels": 51.0,
+            "area_sqm": 5.377274200019905,
+            "width_m": 2.1519723945594813,
+            "height_m": 2.4987654180018692
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.18364926985448,
+            "longitude": 23.860138609189406
+          },
+          "dimensions": {
+            "area_pixels": 139.0,
+            "area_sqm": 40.03515099616203,
+            "width_m": 5.865186387981266,
+            "height_m": 6.825895776850444
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 6,
+      "gap_count": 16,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18397466404872,
+            "longitude": 23.85976809627217
+          },
+          "dimensions": {
+            "area_pixels": 73.0,
+            "area_sqm": 11.075946139726648,
+            "width_m": 3.0802587036286715,
+            "height_m": 3.595784382226963
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18395318318919,
+            "longitude": 23.85979495297771
+          },
+          "dimensions": {
+            "area_pixels": 17.0,
+            "area_sqm": 0.5683270230599806,
+            "width_m": 0.7173206341697023,
+            "height_m": 0.7922914746734122
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.183936110580895,
+            "longitude": 23.859816328722935
+          },
+          "dimensions": {
+            "area_pixels": 47.0,
+            "area_sqm": 4.472041251487132,
+            "width_m": 1.983181427822875,
+            "height_m": 2.2549834265019886
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.183897390237284,
+            "longitude": 23.859864835221714
+          },
+          "dimensions": {
+            "area_pixels": 102.0,
+            "area_sqm": 21.509021104490973,
+            "width_m": 4.303929641912191,
+            "height_m": 4.997530836711062
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18385441425434,
+            "longitude": 23.85991854863279
+          },
+          "dimensions": {
+            "area_pixels": 54.0,
+            "area_sqm": 5.971302771663508,
+            "width_m": 2.278552327395325,
+            "height_m": 2.620656414105471
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18383337584491,
+            "longitude": 23.8599448572423
+          },
+          "dimensions": {
+            "area_pixels": 34.0,
+            "area_sqm": 2.4481834600579546,
+            "width_m": 1.4346445010862838,
+            "height_m": 1.7064739440357801
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.1838202242269,
+            "longitude": 23.859961300123242
+          },
+          "dimensions": {
+            "area_pixels": 24.0,
+            "area_sqm": 1.2343784614513942,
+            "width_m": 1.0126904378716597,
+            "height_m": 1.2189099603286957
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.183804542590444,
+            "longitude": 23.859981031580375
+          },
+          "dimensions": {
+            "area_pixels": 36.0,
+            "area_sqm": 2.6847740376614637,
+            "width_m": 1.519036157308733,
+            "height_m": 1.767419442087581
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.18379094676389,
+            "longitude": 23.85999802255735
+          },
+          "dimensions": {
+            "area_pixels": 18.0,
+            "area_sqm": 0.6943382384590261,
+            "width_m": 0.7595182150767666,
+            "height_m": 0.9141824707770141
+          }
+        },
+        {
+          "gap_id": 10,
+          "coordinates": {
+            "latitude": 46.1837788886512,
+            "longitude": 23.860013095198212
+          },
+          "dimensions": {
+            "area_pixels": 19.0,
+            "area_sqm": 0.7329127442239702,
+            "width_m": 0.8017138468375671,
+            "height_m": 0.9141824693623679
+          }
+        },
+        {
+          "gap_id": 11,
+          "coordinates": {
+            "latitude": 46.18374184649441,
+            "longitude": 23.860059409312868
+          },
+          "dimensions": {
+            "area_pixels": 24.0,
+            "area_sqm": 1.2343802218735396,
+            "width_m": 1.012691882131041,
+            "height_m": 1.2189099603286957
+          }
+        },
+        {
+          "gap_id": 12,
+          "coordinates": {
+            "latitude": 46.1837256112256,
+            "longitude": 23.86007968886603
+          },
+          "dimensions": {
+            "area_pixels": 44.0,
+            "area_sqm": 3.9603046711766026,
+            "width_m": 1.856602468200104,
+            "height_m": 2.1330924303983863
+          }
+        },
+        {
+          "gap_id": 13,
+          "coordinates": {
+            "latitude": 46.18370456682934,
+            "longitude": 23.860105997475536
+          },
+          "dimensions": {
+            "area_pixels": 40.0,
+            "area_sqm": 3.291683018863696,
+            "width_m": 1.6878210483516676,
+            "height_m": 1.9502559362429839
+          }
+        },
+        {
+          "gap_id": 14,
+          "coordinates": {
+            "latitude": 46.18368909762488,
+            "longitude": 23.860125454884653
+          },
+          "dimensions": {
+            "area_pixels": 17.0,
+            "area_sqm": 0.5683297540046227,
+            "width_m": 0.7173240817039863,
+            "height_m": 0.7922914739660891
+          }
+        },
+        {
+          "gap_id": 15,
+          "coordinates": {
+            "latitude": 46.18367155715009,
+            "longitude": 23.86014737872591
+          },
+          "dimensions": {
+            "area_pixels": 23.0,
+            "area_sqm": 1.1238017610516202,
+            "width_m": 0.9704976254987129,
+            "height_m": 1.1579644622768948
+          }
+        },
+        {
+          "gap_id": 16,
+          "coordinates": {
+            "latitude": 46.18365733122823,
+            "longitude": 23.860165191846928
+          },
+          "dimensions": {
+            "area_pixels": 32.0,
+            "area_sqm": 2.139595732391051,
+            "width_m": 1.350257956002331,
+            "height_m": 1.5845829479321782
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 7,
+      "gap_count": 7,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18399746556855,
+            "longitude": 23.859778510096767
+          },
+          "dimensions": {
+            "area_pixels": 29.0,
+            "area_sqm": 1.7152662301182897,
+            "width_m": 1.2236636843252122,
+            "height_m": 1.4017464537767754
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.183870094904265,
+            "longitude": 23.859937457945875
+          },
+          "dimensions": {
+            "area_pixels": 535.0,
+            "area_sqm": 590.2264470847917,
+            "width_m": 22.57458334017449,
+            "height_m": 26.14561864512488
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.1837435883041,
+            "longitude": 23.860095309602926
+          },
+          "dimensions": {
+            "area_pixels": 37.0,
+            "area_sqm": 2.8545043190374138,
+            "width_m": 1.5612333491911117,
+            "height_m": 1.828364940139382
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.183725617253046,
+            "longitude": 23.86011778154021
+          },
+          "dimensions": {
+            "area_pixels": 31.0,
+            "area_sqm": 1.99301036784466,
+            "width_m": 1.308060764718755,
+            "height_m": 1.5236374498803773
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.1837060991152,
+            "longitude": 23.86014217181361
+          },
+          "dimensions": {
+            "area_pixels": 46.0,
+            "area_sqm": 4.376909763063404,
+            "width_m": 1.9409942055432017,
+            "height_m": 2.2549834257946655
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.183680610196625,
+            "longitude": 23.86017396138343
+          },
+          "dimensions": {
+            "area_pixels": 68.0,
+            "area_sqm": 9.617891595046686,
+            "width_m": 2.869297355411632,
+            "height_m": 3.3520023907270824
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.18365381998803,
+            "longitude": 23.86020739524135
+          },
+          "dimensions": {
+            "area_pixels": 48.0,
+            "area_sqm": 4.814091023249146,
+            "width_m": 2.0253871965065016,
+            "height_m": 2.3768744226055905
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 8,
+      "gap_count": 10,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18400492345455,
+            "longitude": 23.859805366802306
+          },
+          "dimensions": {
+            "area_pixels": 45.0,
+            "area_sqm": 4.166013643646518,
+            "width_m": 1.898788343458257,
+            "height_m": 2.1940379284501876
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18396807205668,
+            "longitude": 23.859851406868945
+          },
+          "dimensions": {
+            "area_pixels": 85.0,
+            "area_sqm": 15.082524988116392,
+            "width_m": 3.586603207830544,
+            "height_m": 4.2052393627449725
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18392895548665,
+            "longitude": 23.85990018741574
+          },
+          "dimensions": {
+            "area_pixels": 59.0,
+            "area_sqm": 7.131094084831153,
+            "width_m": 2.489526068745477,
+            "height_m": 2.864438406312675
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18390571100066,
+            "longitude": 23.859929236505405
+          },
+          "dimensions": {
+            "area_pixels": 31.0,
+            "area_sqm": 1.9930038518378599,
+            "width_m": 1.308056487499119,
+            "height_m": 1.5236374505877004
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18388160632174,
+            "longitude": 23.85995938178713
+          },
+          "dimensions": {
+            "area_pixels": 49.0,
+            "area_sqm": 5.04037359323592,
+            "width_m": 2.0675742086301083,
+            "height_m": 2.4378199206573914
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18385464009021,
+            "longitude": 23.859993089693067
+          },
+          "dimensions": {
+            "area_pixels": 72.0,
+            "area_sqm": 10.739087903939017,
+            "width_m": 3.0380699816379138,
+            "height_m": 3.534838884175162
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.1837940183854,
+            "longitude": 23.8600687269454
+          },
+          "dimensions": {
+            "area_pixels": 192.0,
+            "area_sqm": 76.03780041308336,
+            "width_m": 8.101532793275956,
+            "height_m": 9.385606693611436
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.18374271431313,
+            "longitude": 23.860132854181074
+          },
+          "dimensions": {
+            "area_pixels": 34.0,
+            "area_sqm": 2.360752220275693,
+            "width_m": 1.4346468613394467,
+            "height_m": 1.6455284459839792
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.18371218721169,
+            "longitude": 23.86017094685526
+          },
+          "dimensions": {
+            "area_pixels": 89.0,
+            "area_sqm": 16.4789890988137,
+            "width_m": 3.755402057500054,
+            "height_m": 4.388075856193052
+          }
+        },
+        {
+          "gap_id": 10,
+          "coordinates": {
+            "latitude": 46.183672230423475,
+            "longitude": 23.86022082359412
+          },
+          "dimensions": {
+            "area_pixels": 87.0,
+            "area_sqm": 15.661222792800263,
+            "width_m": 3.6710136348557802,
+            "height_m": 4.266184860796773
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 9,
+      "gap_count": 9,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18402032495304,
+            "longitude": 23.859822631827296
+          },
+          "dimensions": {
+            "area_pixels": 30.0,
+            "area_sqm": 1.8515609912885433,
+            "width_m": 1.265858466626431,
+            "height_m": 1.4626919518285766
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18400208934133,
+            "longitude": 23.859845651860613
+          },
+          "dimensions": {
+            "area_pixels": 48.0,
+            "area_sqm": 4.690623048945349,
+            "width_m": 2.0253743537699855,
+            "height_m": 2.3159289245537895
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18398320931961,
+            "longitude": 23.85986949403798
+          },
+          "dimensions": {
+            "area_pixels": 23.0,
+            "area_sqm": 1.0646482598115268,
+            "width_m": 0.970492119581148,
+            "height_m": 1.0970189642250938
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.183964951741714,
+            "longitude": 23.8598925140713
+          },
+          "dimensions": {
+            "area_pixels": 53.0,
+            "area_sqm": 5.724415676279181,
+            "width_m": 2.23635241010128,
+            "height_m": 2.55971091605367
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18392455738161,
+            "longitude": 23.859943487002223
+          },
+          "dimensions": {
+            "area_pixels": 101.0,
+            "area_sqm": 20.778670955993864,
+            "width_m": 4.261732128557926,
+            "height_m": 4.875639840607461
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18389503518295,
+            "longitude": 23.85998075753236
+          },
+          "dimensions": {
+            "area_pixels": 33.0,
+            "area_sqm": 2.2913119813747485,
+            "width_m": 1.3924475058343333,
+            "height_m": 1.6455284466913023
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.183872648433606,
+            "longitude": 23.860008984477975
+          },
+          "dimensions": {
+            "area_pixels": 62.0,
+            "area_sqm": 7.8125807038856125,
+            "width_m": 2.616114852421958,
+            "height_m": 2.986329402416277
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.183787297287545,
+            "longitude": 23.86011668534815
+          },
+          "dimensions": {
+            "area_pixels": 325.0,
+            "area_sqm": 215.63087231708892,
+            "width_m": 13.7135408223854,
+            "height_m": 15.723938486047473
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.183691959605625,
+            "longitude": 23.860236992427044
+          },
+          "dimensions": {
+            "area_pixels": 108.0,
+            "area_sqm": 23.885286810747523,
+            "width_m": 4.557119102333846,
+            "height_m": 5.241312828210942
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 10,
+      "gap_count": 4,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18402320423674,
+            "longitude": 23.859858532117354
+          },
+          "dimensions": {
+            "area_pixels": 77.0,
+            "area_sqm": 12.078865426179261,
+            "width_m": 3.2490371515457803,
+            "height_m": 3.717675379745212
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.183987019864674,
+            "longitude": 23.85990402408796
+          },
+          "dimensions": {
+            "area_pixels": 83.0,
+            "area_sqm": 14.08730472502842,
+            "width_m": 3.5022112870671354,
+            "height_m": 4.0224028678822465
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18391027174854,
+            "longitude": 23.86000048898949
+          },
+          "dimensions": {
+            "area_pixels": 257.0,
+            "area_sqm": 135.4857970071821,
+            "width_m": 10.844218990367029,
+            "height_m": 12.493827091423992
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18376285648074,
+            "longitude": 23.860183553063983
+          },
+          "dimensions": {
+            "area_pixels": 379.0,
+            "area_sqm": 301.1659506596941,
+            "width_m": 15.992109694151672,
+            "height_m": 18.832158884567352
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 11,
+      "gap_count": 5,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18402832504704,
+            "longitude": 23.85988949954313
+          },
+          "dimensions": {
+            "area_pixels": 104.0,
+            "area_sqm": 22.198162316105737,
+            "width_m": 4.388310006841284,
+            "height_m": 5.058476334055539
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18399067794043,
+            "longitude": 23.85993663580183
+          },
+          "dimensions": {
+            "area_pixels": 44.0,
+            "area_sqm": 4.073436617202586,
+            "width_m": 1.8565935281680246,
+            "height_m": 2.1940379277428645
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18396424837429,
+            "longitude": 23.85996979561173
+          },
+          "dimensions": {
+            "area_pixels": 69.0,
+            "area_sqm": 9.759280873088793,
+            "width_m": 2.911477898150086,
+            "height_m": 3.3520023900197593
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18387167233465,
+            "longitude": 23.860085717922374
+          },
+          "dimensions": {
+            "area_pixels": 342.0,
+            "area_sqm": 240.10211950004464,
+            "width_m": 14.430843490879228,
+            "height_m": 16.638120956117163
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18374532452831,
+            "longitude": 23.860243843627437
+          },
+          "dimensions": {
+            "area_pixels": 223.0,
+            "area_sqm": 102.0781753439355,
+            "width_m": 9.409602250717791,
+            "height_m": 10.848298644732692
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 12,
+      "gap_count": 6,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18401273451388,
+            "longitude": 23.859947597722456
+          },
+          "dimensions": {
+            "area_pixels": 238.0,
+            "area_sqm": 117.51251906973364,
+            "width_m": 10.042486978752846,
+            "height_m": 11.701535617457903
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.183914382779356,
+            "longitude": 23.860069823137465
+          },
+          "dimensions": {
+            "area_pixels": 206.0,
+            "area_sqm": 87.93909209608442,
+            "width_m": 8.692251014193502,
+            "height_m": 10.116952668818403
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18384050508505,
+            "longitude": 23.860161629222727
+          },
+          "dimensions": {
+            "area_pixels": 105.0,
+            "area_sqm": 22.681703097257664,
+            "width_m": 4.430520445688893,
+            "height_m": 5.11942183210734
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.1838057198639,
+            "longitude": 23.860204928809207
+          },
+          "dimensions": {
+            "area_pixels": 43.0,
+            "area_sqm": 3.8702921137415083,
+            "width_m": 1.814404316749966,
+            "height_m": 2.1330924303983863
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.183768981556895,
+            "longitude": 23.86025069482783
+          },
+          "dimensions": {
+            "area_pixels": 106.0,
+            "area_sqm": 23.17034147688551,
+            "width_m": 4.472721720328994,
+            "height_m": 5.180367330159141
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18372809011447,
+            "longitude": 23.86030166775875
+          },
+          "dimensions": {
+            "area_pixels": 66.0,
+            "area_sqm": 8.99554962817553,
+            "width_m": 2.7849038411240072,
+            "height_m": 3.2301113939161583
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 13,
+      "gap_count": 7,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18407157193197,
+            "longitude": 23.8599116974324
+          },
+          "dimensions": {
+            "area_pixels": 21.0,
+            "area_sqm": 0.91806477037456,
+            "width_m": 0.8861000694916022,
+            "height_m": 1.0360734661732929
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18405499855198,
+            "longitude": 23.859932251033577
+          },
+          "dimensions": {
+            "area_pixels": 42.0,
+            "area_sqm": 3.6722605111240334,
+            "width_m": 1.772200828303181,
+            "height_m": 2.072146933053909
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.184009137549864,
+            "longitude": 23.859989253020846
+          },
+          "dimensions": {
+            "area_pixels": 158.0,
+            "area_sqm": 51.602013224995765,
+            "width_m": 6.66685937577497,
+            "height_m": 7.7400782462128115
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18391100156032,
+            "longitude": 23.860111204387835
+          },
+          "dimensions": {
+            "area_pixels": 277.0,
+            "area_sqm": 158.85154854051004,
+            "width_m": 11.688128015122025,
+            "height_m": 13.590846056356408
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18380912149856,
+            "longitude": 23.860237814571093
+          },
+          "dimensions": {
+            "area_pixels": 169.0,
+            "area_sqm": 59.1062012990726,
+            "width_m": 7.131034046912187,
+            "height_m": 8.288587729386345
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.183751996584625,
+            "longitude": 23.86030879300716
+          },
+          "dimensions": {
+            "area_pixels": 62.0,
+            "area_sqm": 7.972038691456217,
+            "width_m": 2.616120616565204,
+            "height_m": 3.0472749004680777
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.18372730992993,
+            "longitude": 23.86033948638492
+          },
+          "dimensions": {
+            "area_pixels": 38.0,
+            "area_sqm": 3.0293757596235005,
+            "width_m": 1.6034293244702607,
+            "height_m": 1.889310438191183
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 14,
+      "gap_count": 11,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.184081656898954,
+            "longitude": 23.859936361753814
+          },
+          "dimensions": {
+            "area_pixels": 25.0,
+            "area_sqm": 1.2858047828986565,
+            "width_m": 1.0548808564595877,
+            "height_m": 1.2189099603286957
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.184067523093546,
+            "longitude": 23.85995390082682
+          },
+          "dimensions": {
+            "area_pixels": 31.0,
+            "area_sqm": 1.9929979699774942,
+            "width_m": 1.3080526270923252,
+            "height_m": 1.5236374505877004
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.184039570597776,
+            "longitude": 23.859988704924813
+          },
+          "dimensions": {
+            "area_pixels": 44.0,
+            "area_sqm": 4.073433002778408,
+            "width_m": 1.8565918807834776,
+            "height_m": 2.1940379277428645
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18402508653731,
+            "longitude": 23.860006792093852
+          },
+          "dimensions": {
+            "area_pixels": 16.0,
+            "area_sqm": 0.5348953227859984,
+            "width_m": 0.6751244212037204,
+            "height_m": 0.7922914739660891
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18400348926994,
+            "longitude": 23.86003364879939
+          },
+          "dimensions": {
+            "area_pixels": 60.0,
+            "area_sqm": 7.4062471431006545,
+            "width_m": 2.5317180183634322,
+            "height_m": 2.9253839050717994
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.1839781817155,
+            "longitude": 23.860065164321195
+          },
+          "dimensions": {
+            "area_pixels": 41.0,
+            "area_sqm": 3.4793945064123015,
+            "width_m": 1.730007967915123,
+            "height_m": 2.011201434294785
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.183956355821984,
+            "longitude": 23.86009229507475
+          },
+          "dimensions": {
+            "area_pixels": 52.0,
+            "area_sqm": 5.616408728546432,
+            "width_m": 2.194157431342013,
+            "height_m": 2.55971091605367
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.18392512067238,
+            "longitude": 23.86013120989298
+          },
+          "dimensions": {
+            "area_pixels": 40.0,
+            "area_sqm": 3.291669826320996,
+            "width_m": 1.6878142838329935,
+            "height_m": 1.9502559362429839
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.18388592196851,
+            "longitude": 23.86017999043978
+          },
+          "dimensions": {
+            "area_pixels": 78.0,
+            "area_sqm": 12.636937153162686,
+            "width_m": 3.2912407081450645,
+            "height_m": 3.839566374434167
+          }
+        },
+        {
+          "gap_id": 10,
+          "coordinates": {
+            "latitude": 46.18384647754602,
+            "longitude": 23.86022904503459
+          },
+          "dimensions": {
+            "area_pixels": 95.0,
+            "area_sqm": 18.56710565244083,
+            "width_m": 4.0085655179786785,
+            "height_m": 4.631857847692933
+          }
+        },
+        {
+          "gap_id": 11,
+          "coordinates": {
+            "latitude": 46.183771972345475,
+            "longitude": 23.8603216732639
+          },
+          "dimensions": {
+            "area_pixels": 181.0,
+            "area_sqm": 67.95777986638325,
+            "width_m": 7.637385218520012,
+            "height_m": 8.898042709904352
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 15,
+      "gap_count": 7,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18399105144176,
+            "longitude": 23.860087636258484
+          },
+          "dimensions": {
+            "area_pixels": 497.0,
+            "area_sqm": 507.4035025141572,
+            "width_m": 20.971105439468946,
+            "height_m": 24.195362708881895
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18387238229529,
+            "longitude": 23.860236170283
+          },
+          "dimensions": {
+            "area_pixels": 19.0,
+            "area_sqm": 0.7817722697227155,
+            "width_m": 0.8017124882888333,
+            "height_m": 0.9751279681214919
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18385362111009,
+            "longitude": 23.860259190316317
+          },
+          "dimensions": {
+            "area_pixels": 63.0,
+            "area_sqm": 8.424629219085386,
+            "width_m": 2.6583112073997803,
+            "height_m": 3.1691658958643574
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.183813608426725,
+            "longitude": 23.860308244911128
+          },
+          "dimensions": {
+            "area_pixels": 78.0,
+            "area_sqm": 12.837540351667192,
+            "width_m": 3.2912450394581834,
+            "height_m": 3.9005118724859678
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18378433462666,
+            "longitude": 23.860344145201186
+          },
+          "dimensions": {
+            "area_pixels": 47.0,
+            "area_sqm": 4.713786275315406,
+            "width_m": 1.9831869241741567,
+            "height_m": 2.3768744226055905
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18376446198066,
+            "longitude": 23.860368535474585
+          },
+          "dimensions": {
+            "area_pixels": 28.0,
+            "area_sqm": 1.6561261371299476,
+            "width_m": 1.1814733911629343,
+            "height_m": 1.4017464544840985
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.18375082613439,
+            "longitude": 23.860385252403542
+          },
+          "dimensions": {
+            "area_pixels": 25.0,
+            "area_sqm": 1.3501031520611229,
+            "width_m": 1.0548872087239571,
+            "height_m": 1.2798554583804966
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 16,
+      "gap_count": 12,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18410851360449,
+            "longitude": 23.859976920860138
+          },
+          "dimensions": {
+            "area_pixels": 15.0,
+            "area_sqm": 0.4628894772153172,
+            "width_m": 0.6329281796302201,
+            "height_m": 0.7313459759142882
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.184090413856204,
+            "longitude": 23.859999392797427
+          },
+          "dimensions": {
+            "area_pixels": 61.0,
+            "area_sqm": 7.843409096066333,
+            "width_m": 2.5739092639333405,
+            "height_m": 3.0472749004680777
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18405294700834,
+            "longitude": 23.8600459809601
+          },
+          "dimensions": {
+            "area_pixels": 53.0,
+            "area_sqm": 5.860701938882296,
+            "width_m": 2.2363488427317453,
+            "height_m": 2.620656414105471
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.184034411021045,
+            "longitude": 23.860069000993416
+          },
+          "dimensions": {
+            "area_pixels": 15.0,
+            "area_sqm": 0.4628901000543471,
+            "width_m": 0.6329290312641258,
+            "height_m": 0.7313459759142882
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18401788897068,
+            "longitude": 23.860089554594595
+          },
+          "dimensions": {
+            "area_pixels": 54.0,
+            "area_sqm": 5.971285031889604,
+            "width_m": 2.2785455575702245,
+            "height_m": 2.620656414812794
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18398481786231,
+            "longitude": 23.86013066179695
+          },
+          "dimensions": {
+            "area_pixels": 92.0,
+            "area_sqm": 17.50755352810907,
+            "width_m": 3.881969447113238,
+            "height_m": 4.509966852296653
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.1839400577316,
+            "longitude": 23.86018629354414
+          },
+          "dimensions": {
+            "area_pixels": 95.0,
+            "area_sqm": 18.811377796758038,
+            "width_m": 4.00855872449464,
+            "height_m": 4.692803346452057
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.18390920218602,
+            "longitude": 23.86022466026634
+          },
+          "dimensions": {
+            "area_pixels": 37.0,
+            "area_sqm": 2.854495722948242,
+            "width_m": 1.5612286482779132,
+            "height_m": 1.828364939432059
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.18388119545433,
+            "longitude": 23.860259464364333
+          },
+          "dimensions": {
+            "area_pixels": 82.0,
+            "area_sqm": 13.917604941822525,
+            "width_m": 3.4600226280044395,
+            "height_m": 4.0224028678822465
+          }
+        },
+        {
+          "gap_id": 10,
+          "coordinates": {
+            "latitude": 46.1838556220956,
+            "longitude": 23.860291253934154
+          },
+          "dimensions": {
+            "area_pixels": 20.0,
+            "area_sqm": 0.8743508345185064,
+            "width_m": 0.8439081432562996,
+            "height_m": 1.0360734654659698
+          }
+        },
+        {
+          "gap_id": 11,
+          "coordinates": {
+            "latitude": 46.183812402896535,
+            "longitude": 23.860344967345235
+          },
+          "dimensions": {
+            "area_pixels": 150.0,
+            "area_sqm": 46.67496582541108,
+            "width_m": 6.329319339541723,
+            "height_m": 7.374405259316652
+          }
+        },
+        {
+          "gap_id": 12,
+          "coordinates": {
+            "latitude": 46.18376501399166,
+            "longitude": 23.86040388766861
+          },
+          "dimensions": {
+            "area_pixels": 35.0,
+            "area_sqm": 2.520191995673421,
+            "width_m": 1.4768417680951031,
+            "height_m": 1.706473943328457
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 17,
+      "gap_count": 10,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18410251444429,
+            "longitude": 23.860023234974793
+          },
+          "dimensions": {
+            "area_pixels": 88.0,
+            "area_sqm": 16.293716255387018,
+            "width_m": 3.713180170390878,
+            "height_m": 4.388075856193052
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18407182375988,
+            "longitude": 23.860060779552946
+          },
+          "dimensions": {
+            "area_pixels": 37.0,
+            "area_sqm": 2.854487271785772,
+            "width_m": 1.5612240254224987,
+            "height_m": 1.828364940139382
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18405346994953,
+            "longitude": 23.860083251490234
+          },
+          "dimensions": {
+            "area_pixels": 37.0,
+            "area_sqm": 2.9496378479022796,
+            "width_m": 1.5612245548837644,
+            "height_m": 1.889310438191183
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.184035319294466,
+            "longitude": 23.860105449379507
+          },
+          "dimensions": {
+            "area_pixels": 28.0,
+            "area_sqm": 1.6561179794116112,
+            "width_m": 1.1814675720772994,
+            "height_m": 1.4017464537767754
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.184020294503256,
+            "longitude": 23.86012381059656
+          },
+          "dimensions": {
+            "area_pixels": 27.0,
+            "area_sqm": 1.5275378028284656,
+            "width_m": 1.1392726082871028,
+            "height_m": 1.3408009564322976
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.183982687552174,
+            "longitude": 23.860170124711214
+          },
+          "dimensions": {
+            "area_pixels": 124.0,
+            "area_sqm": 31.88802855256697,
+            "width_m": 5.2322205239292305,
+            "height_m": 6.094549800936157
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.18393816218056,
+            "longitude": 23.8602257564584
+          },
+          "dimensions": {
+            "area_pixels": 69.0,
+            "area_sqm": 9.936727100950543,
+            "width_m": 2.911479291442038,
+            "height_m": 3.4129478887788833
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.183903198184446,
+            "longitude": 23.860269604140914
+          },
+          "dimensions": {
+            "area_pixels": 81.0,
+            "area_sqm": 13.53957133733425,
+            "width_m": 3.417825832995459,
+            "height_m": 3.9614573705377687
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.18384984959484,
+            "longitude": 23.860336471856748
+          },
+          "dimensions": {
+            "area_pixels": 141.0,
+            "area_sqm": 40.611048141776806,
+            "width_m": 5.949555849316458,
+            "height_m": 6.8258957761431205
+          }
+        },
+        {
+          "gap_id": 10,
+          "coordinates": {
+            "latitude": 46.183793937802236,
+            "longitude": 23.86040662814877
+          },
+          "dimensions": {
+            "area_pixels": 105.0,
+            "area_sqm": 22.68172231968522,
+            "width_m": 4.430524200493281,
+            "height_m": 5.11942183210734
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 18,
+      "gap_count": 6,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18412052375878,
+            "longitude": 23.860038581663673
+          },
+          "dimensions": {
+            "area_pixels": 64.0,
+            "area_sqm": 8.558311941068952,
+            "width_m": 2.700493511660941,
+            "height_m": 3.1691658965716805
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18404501400059,
+            "longitude": 23.86013120989298
+          },
+          "dimensions": {
+            "area_pixels": 266.0,
+            "area_sqm": 148.4386915104442,
+            "width_m": 11.223950775890996,
+            "height_m": 13.22517306733828
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.1839446877007,
+            "longitude": 23.860255627692112
+          },
+          "dimensions": {
+            "area_pixels": 176.0,
+            "area_sqm": 63.364655526566494,
+            "width_m": 7.426384181578229,
+            "height_m": 8.532369720886223
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.183884897204244,
+            "longitude": 23.860330990896433
+          },
+          "dimensions": {
+            "area_pixels": 97.0,
+            "area_sqm": 19.456873235988823,
+            "width_m": 4.092953555694107,
+            "height_m": 4.753748844503859
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.18384489507327,
+            "longitude": 23.860380593587276
+          },
+          "dimensions": {
+            "area_pixels": 42.0,
+            "area_sqm": 3.6722745314628398,
+            "width_m": 1.7722075956060346,
+            "height_m": 2.0721469316392627
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18380923871606,
+            "longitude": 23.860424715317805
+          },
+          "dimensions": {
+            "area_pixels": 91.0,
+            "area_sqm": 17.31730928376239,
+            "width_m": 3.8397863771942724,
+            "height_m": 4.509966853003976
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 19,
+      "gap_count": 7,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18413358238298,
+            "longitude": 23.860058861216835
+          },
+          "dimensions": {
+            "area_pixels": 58.0,
+            "area_sqm": 7.010202012318459,
+            "width_m": 2.447321610616713,
+            "height_m": 2.864438405605352
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18409464628112,
+            "longitude": 23.860107367715614
+          },
+          "dimensions": {
+            "area_pixels": 111.0,
+            "area_sqm": 25.4049336805948,
+            "width_m": 4.683671516165344,
+            "height_m": 5.424149322366345
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18405373100898,
+            "longitude": 23.86015834064654
+          },
+          "dimensions": {
+            "area_pixels": 69.0,
+            "area_sqm": 9.936706196888263,
+            "width_m": 2.9114731665133955,
+            "height_m": 3.4129478887788833
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18400600312866,
+            "longitude": 23.860217809065947
+          },
+          "dimensions": {
+            "area_pixels": 146.0,
+            "area_sqm": 44.30377218599078,
+            "width_m": 6.160515686782128,
+            "height_m": 7.191568764453926
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.1839640233107,
+            "longitude": 23.860270152236946
+          },
+          "dimensions": {
+            "area_pixels": 27.0,
+            "area_sqm": 1.527539370641609,
+            "width_m": 1.1392737781989903,
+            "height_m": 1.3408009557249745
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.18392457356391,
+            "longitude": 23.860319480879774
+          },
+          "dimensions": {
+            "area_pixels": 111.0,
+            "area_sqm": 25.40501219712922,
+            "width_m": 4.683685991529083,
+            "height_m": 5.424149322366345
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.1838574868469,
+            "longitude": 23.86040333957258
+          },
+          "dimensions": {
+            "area_pixels": 179.0,
+            "area_sqm": 66.28611942200503,
+            "width_m": 7.552982399234348,
+            "height_m": 8.776151713093428
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 20,
+      "gap_count": 9,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18413993118783,
+            "longitude": 23.860088184354517
+          },
+          "dimensions": {
+            "area_pixels": 61.0,
+            "area_sqm": 7.843402059757606,
+            "width_m": 2.573906954883794,
+            "height_m": 3.0472749004680777
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18412000631286,
+            "longitude": 23.86011284867593
+          },
+          "dimensions": {
+            "area_pixels": 19.0,
+            "area_sqm": 0.7817687473448429,
+            "width_m": 0.8017088754861501,
+            "height_m": 0.975127968828815
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18410357539293,
+            "longitude": 23.86013312822909
+          },
+          "dimensions": {
+            "area_pixels": 41.0,
+            "area_sqm": 3.5848225548863084,
+            "width_m": 1.7300040353927535,
+            "height_m": 2.0721469323465858
+          }
+        },
+        {
+          "gap_id": 4,
+          "coordinates": {
+            "latitude": 46.18408229269035,
+            "longitude": 23.8601594368386
+          },
+          "dimensions": {
+            "area_pixels": 25.0,
+            "area_sqm": 1.2858047700793525,
+            "width_m": 1.0548808459425647,
+            "height_m": 1.2189099603286957
+          }
+        },
+        {
+          "gap_id": 5,
+          "coordinates": {
+            "latitude": 46.184067441636884,
+            "longitude": 23.860177798055652
+          },
+          "dimensions": {
+            "area_pixels": 28.0,
+            "area_sqm": 1.5841119188258828,
+            "width_m": 1.1814668771127708,
+            "height_m": 1.3408009564322976
+          }
+        },
+        {
+          "gap_id": 6,
+          "coordinates": {
+            "latitude": 46.1840255512099,
+            "longitude": 23.860229593130622
+          },
+          "dimensions": {
+            "area_pixels": 85.0,
+            "area_sqm": 15.082509199246314,
+            "width_m": 3.5865994532594683,
+            "height_m": 4.2052393627449725
+          }
+        },
+        {
+          "gap_id": 7,
+          "coordinates": {
+            "latitude": 46.18398173337093,
+            "longitude": 23.860284676781777
+          },
+          "dimensions": {
+            "area_pixels": 78.0,
+            "area_sqm": 12.43632902803723,
+            "width_m": 3.2912349332975985,
+            "height_m": 3.778620876382366
+          }
+        },
+        {
+          "gap_id": 8,
+          "coordinates": {
+            "latitude": 46.18392512257329,
+            "longitude": 23.860356203313877
+          },
+          "dimensions": {
+            "area_pixels": 173.0,
+            "area_sqm": 60.94992734542289,
+            "width_m": 7.299800561920026,
+            "height_m": 8.349533227438144
+          }
+        },
+        {
+          "gap_id": 9,
+          "coordinates": {
+            "latitude": 46.1838492185637,
+            "longitude": 23.860452120119376
+          },
+          "dimensions": {
+            "area_pixels": 161.0,
+            "area_sqm": 52.995982473894415,
+            "width_m": 6.793465090124559,
+            "height_m": 7.801023744264612
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 21,
+      "gap_count": 3,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18415657664376,
+            "longitude": 23.86010572342752
+          },
+          "dimensions": {
+            "area_pixels": 33.0,
+            "area_sqm": 2.291301083812303,
+            "width_m": 1.3924408839022957,
+            "height_m": 1.6455284459839792
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.184113737526665,
+            "longitude": 23.860158888742568
+          },
+          "dimensions": {
+            "area_pixels": 145.0,
+            "area_sqm": 43.62735192813519,
+            "width_m": 6.11830835733108,
+            "height_m": 7.130623267109448
+          }
+        },
+        {
+          "gap_id": 3,
+          "coordinates": {
+            "latitude": 46.18395409140608,
+            "longitude": 23.860357025457926
+          },
+          "dimensions": {
+            "area_pixels": 554.0,
+            "area_sqm": 635.4064031858804,
+            "width_m": 23.37626372133658,
+            "height_m": 27.18169211129818
+          }
+        }
+      ]
+    },
+    {
+      "row_id": 22,
+      "gap_count": 2,
+      "gaps": [
+        {
+          "gap_id": 1,
+          "coordinates": {
+            "latitude": 46.18415276163541,
+            "longitude": 23.860148200869954
+          },
+          "dimensions": {
+            "area_pixels": 46.0,
+            "area_sqm": 4.376874201819703,
+            "width_m": 1.9409784342567735,
+            "height_m": 2.2549834272093117
+          }
+        },
+        {
+          "gap_id": 2,
+          "coordinates": {
+            "latitude": 46.18399596663143,
+            "longitude": 23.86034578948928
+          },
+          "dimensions": {
+            "area_pixels": 669.0,
+            "area_sqm": 913.5397628255342,
+            "width_m": 28.2287276691456,
+            "height_m": 32.36205944287196
+          }
+        }
+      ]
+    }
+  ]
+}

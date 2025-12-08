@@ -41,3 +41,21 @@ server-example
 # generated native folders
 /ios
 /android
+
+# Python virtual environment
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+
+# YOLO models and cache
+backend/yolov8*.pt
+backend/.ultralytics/
+
+# Uploaded files and annotations
+backend/uploads/
+backend/annotations/
+backend/cache/
+
+# Temporary files
+backend/*.log
