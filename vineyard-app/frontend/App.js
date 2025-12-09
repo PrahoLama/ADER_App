@@ -21,7 +21,7 @@ import FlightPathMap from './FlightPathMap';
 const BACKEND_PORT = 5000;
 
 export default function App() {
-  const [backendIP, setBackendIP] = useState('10.209.168.211');
+  const [backendIP, setBackendIP] = useState('192.168.137.217');
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedLogFile, setSelectedLogFile] = useState(null); // Keep for backward compatibility
   const [selectedLogFiles, setSelectedLogFiles] = useState([]); // NEW: Support multiple log files
@@ -198,7 +198,7 @@ export default function App() {
         setProcessingProgress(prev => {
           if (prev.percentage >= 95) return prev;
           const elapsed = Date.now() - prev.startTime;
-          const avgTimePerImage = 3000; // 3 seconds per image for YOLO
+          const avgTimePerImage = 4000; // 4 seconds per image for YOLO
           const estimatedTotal = avgTimePerImage * prev.total;
           const remaining = Math.max(0, estimatedTotal - elapsed);
           const estimatedCurrent = Math.min(prev.total, Math.floor(elapsed / avgTimePerImage));
@@ -218,7 +218,7 @@ export default function App() {
         requestData,
         {
           headers: { 'Content-Type': 'application/json' },
-          timeout: 600000,
+          timeout: 1800000, // 30 minutes for large batches
         }
       );
 
@@ -784,12 +784,21 @@ export default function App() {
         }));
 
         console.log('✅ Image annotation complete');
+        console.log('🔍 Checking YOLO conditions:');
+        console.log('  - enableAutoAnnotation:', enableAutoAnnotation);
+        console.log('  - annotations count:', response.data.data.annotations?.length);
+        console.log('  - annotatedImages count:', response.data.data.annotatedImages?.length);
         
         // If YOLO auto-annotation is enabled, run it next
         if (enableAutoAnnotation && response.data.data.annotations && response.data.data.annotatedImages) {
           console.log('🤖 Starting YOLO auto-annotation...');
           await runYoloAutoAnnotation(response.data.data.annotations, response.data.data.annotatedImages);
         } else {
+          console.log('⚠️ YOLO auto-annotation skipped');
+          if (!enableAutoAnnotation) console.log('  Reason: YOLO not enabled');
+          if (!response.data.data.annotations) console.log('  Reason: No annotations');
+          if (!response.data.data.annotatedImages) console.log('  Reason: No annotated images');
+          
           setResults({ type: 'image-annotation', data: response.data.data });
           setSelectedLogFile(null);
           setSelectedLogFiles([]);
@@ -1660,6 +1669,7 @@ export default function App() {
             </>
           )}
 
+          {analysisType !== 'manual-annotation' && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[
@@ -1743,6 +1753,7 @@ export default function App() {
               </View>
             )}
           </View>
+          )}
         </ScrollView>
       </View>
     );

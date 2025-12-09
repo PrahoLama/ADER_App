@@ -1388,25 +1388,25 @@ function generateAnnotationCSV(annotations) {
   for (const ann of annotations) {
     const row = [
       `"${ann.imageName}"`,
-      ann.matchMethod,
+      ann.matchMethod || 'unknown',
       ann.timestamp ? `"${ann.timestamp}"` : '',
-      ann.gps.latitude,
-      ann.gps.longitude,
-      ann.gps.altitude,
-      ann.gps.height,
-      ann.gps.satellites,
-      ann.orientation.pitch,
-      ann.orientation.roll,
-      ann.orientation.yaw,
-      ann.gimbal.pitch,
-      ann.gimbal.roll,
-      ann.gimbal.yaw,
-      ann.speed.horizontal,
-      ann.speed.xSpeed,
-      ann.speed.ySpeed,
-      ann.speed.zSpeed,
-      ann.battery.level,
-      `"${ann.flightMode}"`
+      ann.gps?.latitude || '',
+      ann.gps?.longitude || '',
+      ann.gps?.altitude || '',
+      ann.gps?.height || '',
+      ann.gps?.satellites || '',
+      ann.orientation?.pitch || '',
+      ann.orientation?.roll || '',
+      ann.orientation?.yaw || '',
+      ann.gimbal?.pitch || '',
+      ann.gimbal?.roll || '',
+      ann.gimbal?.yaw || '',
+      ann.speed?.horizontal || '',
+      ann.speed?.xSpeed || '',
+      ann.speed?.ySpeed || '',
+      ann.speed?.zSpeed || '',
+      ann.battery?.level || '',
+      ann.flightMode ? `"${ann.flightMode}"` : ''
     ];
     csv += row.join(',') + '\n';
   }

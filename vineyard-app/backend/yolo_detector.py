@@ -181,6 +181,18 @@ class MultiIndustryDetector:
                 if confidence < min_confidence:
                     continue
                 
+                # Filter out non-existent classes for this dataset
+                excluded_classes = [
+                    'fire hydrant', 'bird', 'horse', 'giraffe', 'frisbee',
+                    'surfboard', 'snowboard', 'boat', 'kite', 'bear',
+                    'traffic light', 'sheep', 'carrot', 'vase', 'parking meter',
+                    'sports ball', 'train', 'cup', 'umbrella', 'baseball bat',
+                    'bench', 'truck'
+                ]
+                
+                if class_name.lower() in excluded_classes:
+                    continue
+                
                 # Calculate normalized coordinates (0-1)
                 detection = {
                     'class': class_name,
