@@ -21,4 +21,14 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
+
+# Large backend temporary and project files
+vineyard-app/backend/orthomosaic_projects/
+vineyard-app/backend/odm_projects/
+vineyard-app/backend/NodeODM/
+vineyard-app/backend/odm-engine/
+vineyard-app/backend/uploads/
+vineyard-app/backend/tmp/
+vineyard-app/backend/cache/
+vineyard-app/backend/venv/
 *.sw?
