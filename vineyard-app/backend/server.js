@@ -73,7 +73,21 @@ const upload = multer({
 // Health check
 app.get('/api/health', (req, res) => {
   console.log('✅ Health check received');
-  res.json({ status: 'Backend running', timestamp: new Date() });
+  
+  // Check if ODM is installed
+  const odmPath = path.join(__dirname, 'odm-engine');
+  const odmRunScript = path.join(odmPath, 'run.sh');
+  const odmInstalled = fs.existsSync(odmRunScript) && fs.existsSync(path.join(odmPath, 'SuperBuild', 'install'));
+  
+  res.json({ 
+    status: 'Backend running', 
+    timestamp: new Date(),
+    odm: {
+      installed: odmInstalled,
+      path: odmInstalled ? odmPath : null,
+      engine: 'OpenDroneMap (native)'
+    }
+  });
 });
 
 // ==================== STREAMING CSV PARSER ====================
@@ -1930,6 +1944,727 @@ app.get('/api/export-annotations', (req, res) => {
     
   } catch (err) {
     res.status(500).json({ error: 'Export failed', details: err.message });
+  }
+});
+
+// ==================== ORTHOMOSAIC GENERATION API ====================
+// Local TIF processor - merges georeferenced images into orthomosaic
+// Uses GDAL instead of external services
+
+// Helper function to run Python script
+function runPythonScript(scriptPath, args) {
+  return new Promise((resolve, reject) => {
+    const pythonProcess = spawn('python3', [scriptPath, ...args]);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+      console.log(data.toString());
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+      console.error(data.toString());
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (e) {
+          resolve({ success: true, output: stdout });
+        }
+      } else {
+        reject(new Error(`Process exited with code ${code}: ${stderr}`));
+      }
+    });
+  });
+}
+
+// Create new orthomosaic project
+app.post('/api/orthomosaic/create', async (req, res) => {
+  try {
+    const { project_name } = req.body;
+    
+    console.log('📦 Creating orthomosaic project:', project_name);
+    
+    // Generate unique project ID
+    const projectId = `${project_name || 'project'}_${Date.now()}`;
+    
+    // Create project directory
+    const projectPath = path.join(__dirname, 'orthomosaic_projects', projectId);
+    const imagesPath = path.join(projectPath, 'images');
+    
+    if (!fs.existsSync(imagesPath)) {
+      fs.mkdirSync(imagesPath, { recursive: true });
+    }
+    
+    // Save project metadata
+    const metadata = {
+      project_id: projectId,
+      project_name: project_name || 'Unnamed Project',
+      created_at: new Date().toISOString(),
+      status: 'created',
+      images_count: 0
+    };
+    
+    fs.writeFileSync(
+      path.join(projectPath, 'metadata.json'),
+      JSON.stringify(metadata, null, 2)
+    );
+    
+    console.log('✅ Project created:', projectId);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload images to project
+const uploadOrthomosaicImages = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      // Create temporary directory for upload
+      const tmpDir = path.join(__dirname, 'tmp', req.body.project_id || 'temp');
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      cb(null, tmpDir);
+    },
+    filename: (req, file, cb) => {
+      cb(null, file.originalname);
+    }
+  }),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB per image
+    files: 1000 // Max 1000 images
+  }
+});
+
+// NodeODM API client for WebODM-compatible processing (Docker container)
+const NODEODM_URL = 'http://localhost:3002';
+
+async function processWithNodeODM(project_id, imagesPath, options) {
+  try {
+    const projectPath = path.dirname(imagesPath);
+    
+    // Get list of images
+    const imageFiles = fs.readdirSync(imagesPath).filter(f => 
+      f.toLowerCase().endsWith('.jpg') || 
+      f.toLowerCase().endsWith('.jpeg') ||
+      f.toLowerCase().endsWith('.tif') ||
+      f.toLowerCase().endsWith('.tiff')
+    );
+    
+    console.log(`📸 Uploading ${imageFiles.length} images to NodeODM...`);
+    
+    // Create multipart form for NodeODM
+    const form = new FormData();
+    
+    // Add images
+    for (const filename of imageFiles) {
+      const filepath = path.join(imagesPath, filename);
+      form.append('images', fs.createReadStream(filepath), filename);
+    }
+    
+    // Add options - only generate orthophoto (no DSM, DTM, or 3D mesh)
+    const odmOptions = [
+      { name: 'orthophoto-resolution', value: options?.orthophoto_resolution || 10 },
+      { name: 'dsm', value: false },
+      { name: 'dtm', value: false },
+      { name: 'use-3dmesh', value: false },
+      { name: 'pc-quality', value: 'medium' },
+      { name: 'feature-quality', value: 'medium' }
+    ];
+    
+    form.append('options', JSON.stringify(odmOptions));
+    form.append('name', project_id);
+    
+    // Submit task to NodeODM (single-step API)
+    const response = await axios.post(`${NODEODM_URL}/task/new`, form, {
+      headers: form.getHeaders(),
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 600000 // 10 minutes for upload
+    });
+    
+    const taskId = response.data.uuid;
+    console.log(`✅ NodeODM task created: ${taskId}`);
+    
+    // Update metadata with NodeODM task ID
+    const metadataPath = path.join(projectPath, 'metadata.json');
+    if (fs.existsSync(metadataPath)) {
+      const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+      metadata.nodeodm_task_id = taskId;
+      metadata.nodeodm_url = NODEODM_URL;
+      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    }
+    
+    console.log(`🚀 NodeODM task ${taskId} started processing`);
+    
+    return taskId; // Return taskId for monitoring
+    
+  } catch (error) {
+    console.error('Error processing with NodeODM:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+async function monitorNodeODMTask(project_id, taskId, projectPath, outputPath) {
+  const metadataPath = path.join(projectPath, 'metadata.json');
+  
+  if (!taskId) {
+    console.error(`❌ No taskId provided for ${project_id}`);
+    return;
+  }
+  
+  const checkInterval = setInterval(async () => {
+    try {
+      const info = await axios.get(`${NODEODM_URL}/task/${taskId}/info`);
+      const status = info.data.status;
+      const progress = info.data.progress || 0;
+      
+      console.log(`[${project_id}] NodeODM status: ${status.code} (${progress}%)`);
+      
+      // Update metadata
+      if (fs.existsSync(metadataPath)) {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        metadata.status = status.code === 40 ? 'completed' : 'processing';
+        metadata.progress = progress;
+        metadata.updated_at = new Date().toISOString();
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+      }
+      
+      // If completed, download orthophoto
+      if (status.code === 40) {
+        clearInterval(checkInterval);
+        console.log(`✅ NodeODM task ${taskId} completed!`);
+        
+        // Download orthophoto
+        const outputPath = path.join(projectPath, 'output');
+        fs.mkdirSync(outputPath, { recursive: true });
+        
+        const orthophotoResponse = await axios.get(
+          `${NODEODM_URL}/task/${taskId}/download/orthophoto.tif`,
+          { responseType: 'stream' }
+        );
+        
+        const outputFile = path.join(outputPath, 'orthomosaic.tif');
+        const writer = fs.createWriteStream(outputFile);
+        orthophotoResponse.data.pipe(writer);
+        
+        writer.on('finish', () => {
+          console.log(`📥 Downloaded orthophoto to ${outputFile}`);
+          
+          // Final metadata update
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+            metadata.status = 'completed';
+            metadata.progress = 100;
+            metadata.completed_at = new Date().toISOString();
+            metadata.output_file = outputFile;
+            metadata.file_size_mb = fs.statSync(outputFile).size / (1024 * 1024);
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+          }
+        });
+      }
+      
+      // If failed, check if orthophoto was generated anyway (some errors happen in post-processing)
+      if (status.code === 30) {
+        clearInterval(checkInterval);
+        console.warn(`⚠️ NodeODM task ${taskId} returned error code 30, checking for output...`);
+        
+        try {
+          // Try to download orthophoto anyway
+          const outputPath = path.join(projectPath, 'output');
+          fs.mkdirSync(outputPath, { recursive: true });
+          
+          const orthophotoResponse = await axios.get(
+            `${NODEODM_URL}/task/${taskId}/download/orthophoto.tif`,
+            { responseType: 'stream' }
+          );
+          
+          const outputFile = path.join(outputPath, 'orthomosaic.tif');
+          const writer = fs.createWriteStream(outputFile);
+          orthophotoResponse.data.pipe(writer);
+          
+          writer.on('finish', () => {
+            console.log(`✅ Successfully downloaded orthophoto despite error code!`);
+            
+            // Mark as completed
+            if (fs.existsSync(metadataPath)) {
+              const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+              metadata.status = 'completed';
+              metadata.progress = 100;
+              metadata.completed_at = new Date().toISOString();
+              metadata.output_file = outputFile;
+              metadata.file_size_mb = fs.statSync(outputFile).size / (1024 * 1024);
+              metadata.warning = status.errorMessage || 'Processing completed with warnings';
+              fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+            }
+          });
+          
+          writer.on('error', () => {
+            // If download fails, mark as failed
+            if (fs.existsSync(metadataPath)) {
+              const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+              metadata.status = 'failed';
+              metadata.error = status.errorMessage || 'NodeODM processing failed';
+              fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+            }
+          });
+          
+        } catch (downloadError) {
+          console.error(`❌ Failed to download orthophoto:`, downloadError.message);
+          
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+            metadata.status = 'failed';
+            metadata.error = status.errorMessage || 'NodeODM processing failed';
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error(`Error monitoring task ${taskId}:`, error.message);
+    }
+  }, 5000); // Check every 5 seconds
+}
+
+app.post('/api/orthomosaic/upload', uploadOrthomosaicImages.array('images', 1000), async (req, res) => {
+  try {
+    const { project_id } = req.body;
+    
+    console.log(`📤 Uploading ${req.files.length} images to project ${project_id}`);
+    
+    const projectPath = path.join(__dirname, 'orthomosaic_projects', project_id);
+    const imagesPath = path.join(projectPath, 'images');
+    
+    // Ensure images directory exists
+    if (!fs.existsSync(imagesPath)) {
+      fs.mkdirSync(imagesPath, { recursive: true });
+    }
+    
+    // Copy uploaded files to project images directory
+    for (const file of req.files) {
+      const destPath = path.join(imagesPath, file.filename);
+      fs.copyFileSync(file.path, destPath);
+      // Delete temp file after copying
+      fs.unlinkSync(file.path);
+    }
+    
+    // Update metadata
+    const metadataPath = path.join(projectPath, 'metadata.json');
+    if (fs.existsSync(metadataPath)) {
+      const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+      metadata.images_count = req.files.length;
+      metadata.uploaded_at = new Date().toISOString();
+      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    }
+    
+    // Cleanup temp directory if exists
+    const tmpDir = path.join(__dirname, 'tmp', project_id);
+    if (fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+    
+    console.log(`✅ Uploaded ${req.files.length} images to ${project_id}`);
+    res.json({ 
+      status: 'success',
+      images_uploaded: req.files.length,
+      project_id: project_id
+    });
+  } catch (error) {
+    console.error('Error uploading images:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Start orthomosaic processing
+app.post('/api/orthomosaic/process', async (req, res) => {
+  try {
+    const { project_id, options } = req.body;
+    
+    console.log(`🚀 Starting orthomosaic processing for ${project_id}`);
+    console.log('Options:', options);
+    
+    const projectPath = path.join(__dirname, 'orthomosaic_projects', project_id);
+    const imagesPath = path.join(projectPath, 'images');
+    
+    // Update metadata
+    const metadataPath = path.join(projectPath, 'metadata.json');
+    if (fs.existsSync(metadataPath)) {
+      const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+      metadata.status = 'processing';
+      metadata.processing_started_at = new Date().toISOString();
+      metadata.options = options;
+      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    }
+    
+    // Create output directory
+    const outputPath = path.join(projectPath, 'output');
+    if (!fs.existsSync(outputPath)) {
+      fs.mkdirSync(outputPath, { recursive: true });
+    }
+    
+    const outputFile = path.join(outputPath, 'orthomosaic.tif');
+    
+    // Use NodeODM API for full WebODM photogrammetry processing
+    console.log('🚀 Starting NodeODM processing for', project_id);
+    
+    // Start NodeODM processing asynchronously
+    processWithNodeODM(project_id, imagesPath, options).then(taskId => {
+      console.log(`✅ NodeODM task ${taskId} started for ${project_id}`);
+      
+      // Monitor NodeODM task in background
+      monitorNodeODMTask(project_id, taskId, projectPath, outputPath);
+    }).catch(error => {
+      console.error(`❌ Failed to start NodeODM task for ${project_id}:`, error);
+      
+      // Update metadata with error
+      const metadataPath = path.join(projectPath, 'metadata.json');
+      if (fs.existsSync(metadataPath)) {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        metadata.status = 'failed';
+        metadata.error = error.response?.data?.error || error.message;
+        metadata.completed_at = new Date().toISOString();
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+      }
+    });
+    
+    // Return immediately (NodeODM handles processing)
+    res.json({ 
+      status: 'processing_started',
+      project_id,
+      message: 'WebODM processing started',
+      estimated_time: '15-60 minutes'
+    });
+  } catch (error) {
+    console.error('Error starting processing:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dummy process handle for compatibility (NodeODM manages its own processes)
+const dummyProcessHandle = {
+  stdout: { on: () => {} },
+  stderr: { on: () => {} },
+  on: () => {},
+  unref: () => {}
+};
+
+if (false) { // Dead code block to preserve old spawn logic for reference
+    const processHandle = spawn('python3', [], {
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+} // End dead code block
+
+// monitorNodeODMTask function polls NodeODM for task status and downloads result when complete
+async function monitorNodeODMTask(project_id, taskId, projectPath, outputPath) {
+  const metadataPath = path.join(projectPath, 'metadata.json');
+  
+  const checkInterval = setInterval(async () => {
+    try {
+      const statusResponse = await axios.get(`${NODEODM_URL}/task/${taskId}/info`);
+      const taskInfo = statusResponse.data;
+      
+      console.log(`[NodeODM ${project_id}] Status: ${taskInfo.status.code} - ${taskInfo.progress}%`);
+      
+      // Update metadata with progress
+      if (fs.existsSync(metadataPath)) {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        metadata.progress = taskInfo.progress || 0;
+        metadata.nodeodm_status = taskInfo.status.code;
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+      }
+      
+      // Check if completed
+      if (taskInfo.status.code === 40) { // Completed
+        clearInterval(checkInterval);
+        
+        console.log(`✅ NodeODM task ${taskId} completed for ${project_id}`);
+        
+        // Download orthomosaic
+        try {
+          console.log(`⬇️ Downloading orthomosaic from NodeODM task ${taskId}...`);
+          
+          // NodeODM doesn't expose individual files - need to download all.zip and extract
+          const zipResponse = await axios.get(`${NODEODM_URL}/task/${taskId}/download/all.zip`, {
+            responseType: 'arraybuffer'
+          });
+          
+          console.log(`📦 Downloaded zip file - Size: ${(zipResponse.data.length / 1024 / 1024).toFixed(2)} MB`);
+          
+          // Save zip temporarily
+          const tempZipPath = path.join(outputPath, 'temp_all.zip');
+          fs.writeFileSync(tempZipPath, zipResponse.data);
+          
+          // Extract orthophoto using unzipper
+          const AdmZip = require('adm-zip');
+          const zip = new AdmZip(tempZipPath);
+          const zipEntries = zip.getEntries();
+          
+          // Find the orthophoto file
+          const orthophotoEntry = zipEntries.find(entry => 
+            entry.entryName.includes('odm_orthophoto.tif') || 
+            entry.entryName.includes('orthophoto.tif')
+          );
+          
+          if (!orthophotoEntry) {
+            throw new Error('Orthophoto not found in downloaded files');
+          }
+          
+          console.log(`📄 Found orthophoto: ${orthophotoEntry.entryName}`);
+          
+          // Extract the orthophoto
+          const orthomosaicPath = path.join(outputPath, 'orthomosaic.tif');
+          fs.writeFileSync(orthomosaicPath, orthophotoEntry.getData());
+          
+          // Clean up temp zip
+          fs.unlinkSync(tempZipPath);
+          
+          // Verify file size
+          const stats = fs.statSync(orthomosaicPath);
+          console.log(`📥 Downloaded orthomosaic for ${project_id} - Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+          
+          if (stats.size < 1000) {
+            throw new Error(`Downloaded file is too small: ${stats.size} bytes`);
+          }
+          
+          // Update metadata
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+            metadata.status = 'completed';
+            metadata.completed_at = new Date().toISOString();
+            metadata.output_file = 'orthomosaic.tif';
+            metadata.output_size = stats.size;
+            metadata.progress = 100;
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+          }
+        } catch (downloadError) {
+          console.error(`❌ Failed to download orthomosaic for ${project_id}:`, downloadError.message);
+          console.error('Error details:', downloadError);
+          
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+            metadata.status = 'failed';
+            metadata.error = 'Failed to download orthomosaic: ' + downloadError.message;
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+          }
+        }
+      } else if (taskInfo.status.code === 30) { // Error (but might have generated orthophoto)
+        clearInterval(checkInterval);
+        
+        console.warn(`⚠️ NodeODM task ${taskId} returned error for ${project_id}, attempting download anyway...`);
+        
+        // Try to download orthomosaic anyway (error might be in optional steps)
+        try {
+          console.log(`⬇️ Attempting download despite error status for task ${taskId}...`);
+          
+          // NodeODM doesn't expose individual files - download all.zip and extract
+          const zipResponse = await axios.get(`${NODEODM_URL}/task/${taskId}/download/all.zip`, {
+            responseType: 'arraybuffer'
+          });
+          
+          console.log(`📦 Downloaded zip file - Size: ${(zipResponse.data.length / 1024 / 1024).toFixed(2)} MB`);
+          
+          // Save zip temporarily
+          const tempZipPath = path.join(outputPath, 'temp_all.zip');
+          fs.writeFileSync(tempZipPath, zipResponse.data);
+          
+          // Extract orthophoto using adm-zip
+          const AdmZip = require('adm-zip');
+          const zip = new AdmZip(tempZipPath);
+          const zipEntries = zip.getEntries();
+          
+          // Find the orthophoto file
+          const orthophotoEntry = zipEntries.find(entry => 
+            entry.entryName.includes('odm_orthophoto.tif') || 
+            entry.entryName.includes('orthophoto.tif')
+          );
+          
+          if (!orthophotoEntry) {
+            throw new Error('Orthophoto not found in downloaded files');
+          }
+          
+          console.log(`📄 Found orthophoto: ${orthophotoEntry.entryName}`);
+          
+          // Extract the orthophoto
+          const orthomosaicPath = path.join(outputPath, 'orthomosaic.tif');
+          fs.writeFileSync(orthomosaicPath, orthophotoEntry.getData());
+          
+          // Clean up temp zip
+          fs.unlinkSync(tempZipPath);
+          
+          // Verify file size
+          const stats = fs.statSync(orthomosaicPath);
+          console.log(`✅ Successfully downloaded orthomosaic despite error status - Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+          
+          // Update metadata as completed with warning
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+            metadata.status = 'completed';
+            metadata.completed_at = new Date().toISOString();
+            metadata.output_file = 'orthomosaic.tif';
+            metadata.output_size = stats.size;
+            metadata.progress = 100;
+            metadata.warning = taskInfo.status.errorMessage || 'Completed with warnings';
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+          }
+        } catch (downloadError) {
+          console.error(`❌ Failed - no orthomosaic available for ${project_id}:`, downloadError.message);
+          
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+            metadata.status = 'failed';
+            metadata.error = taskInfo.status.errorMessage || 'NodeODM processing failed';
+            metadata.completed_at = new Date().toISOString();
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error checking NodeODM status for ${project_id}:`, error.message);
+    }
+  }, 10000); // Check every 10 seconds
+}
+
+// Get project status
+app.get('/api/orthomosaic/status/:project_id', async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    
+    const projectPath = path.join(__dirname, 'orthomosaic_projects', project_id);
+    const metadataPath = path.join(projectPath, 'metadata.json');
+    const outputPath = path.join(projectPath, 'output');
+    
+    if (!fs.existsSync(metadataPath)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+    
+    // Check if orthomosaic.tif exists
+    const orthomosaicPath = path.join(outputPath, 'orthomosaic.tif');
+    if (fs.existsSync(orthomosaicPath)) {
+      metadata.status = 'completed';
+      metadata.completed_at = new Date().toISOString();
+      
+      // Get file stats
+      const stats = fs.statSync(orthomosaicPath);
+      metadata.output_file = 'orthomosaic.tif';
+      metadata.output_size = stats.size;
+      
+      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    }
+    
+    // Calculate progress
+    let progress = 0;
+    if (metadata.status === 'completed') {
+      progress = 100;
+    } else if (metadata.progress !== undefined) {
+      // Use actual progress from Python script
+      progress = metadata.progress;
+    } else if (metadata.status === 'processing' && metadata.processing_started_at) {
+      const startTime = new Date(metadata.processing_started_at).getTime();
+      const now = Date.now();
+      const elapsed = (now - startTime) / 1000; // seconds
+      const estimatedTotal = 600; // 10 minutes estimate
+      progress = Math.min(95, Math.floor((elapsed / estimatedTotal) * 100));
+    }
+    
+    const response = {
+      status: {
+        status: metadata.status,
+        progress: progress,
+        project_id: project_id,
+        images_count: metadata.images_count,
+        error: metadata.error || null,
+        output_file: metadata.output_file || null,
+        completed_at: metadata.completed_at || null
+      }
+    };
+    
+    // Log completion events
+    if (metadata.status === 'completed' && progress === 100) {
+      console.log(`✅ Status check: Project ${project_id} is COMPLETED (100%)`);
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error('Error getting status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List all projects
+app.get('/api/orthomosaic/projects', async (req, res) => {
+  try {
+    const projectsDir = path.join(__dirname, 'orthomosaic_projects');
+    
+    if (!fs.existsSync(projectsDir)) {
+      return res.json({ projects: [] });
+    }
+    
+    const projects = [];
+    const dirs = fs.readdirSync(projectsDir);
+    
+    for (const dir of dirs) {
+      const metadataPath = path.join(projectsDir, dir, 'metadata.json');
+      if (fs.existsSync(metadataPath)) {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        projects.push(metadata);
+      }
+    }
+    
+    res.json({ projects });
+  } catch (error) {
+    console.error('Error listing projects:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Download orthophoto
+app.get('/api/orthomosaic/download/:project_id', async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    
+    const projectPath = path.join(__dirname, 'orthomosaic_projects', project_id);
+    const orthomosaicPath = path.join(projectPath, 'output', 'orthomosaic.tif');
+    
+    if (!fs.existsSync(orthomosaicPath)) {
+      return res.status(404).json({ error: 'Orthomosaic not found. Please wait for processing to complete.' });
+    }
+    
+    console.log(`📥 Downloading orthomosaic for project ${project_id}`);
+    res.download(orthomosaicPath, `${project_id}_orthomosaic.tif`);
+  } catch (error) {
+    console.error('Error downloading orthomosaic:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete project
+app.delete('/api/orthomosaic/project/:project_id', async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    
+    console.log(`🗑️  Deleting project ${project_id}`);
+    
+    const projectDir = path.join(__dirname, 'orthomosaic_projects', project_id);
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+    
+    res.json({ success: true, message: 'Project deleted' });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

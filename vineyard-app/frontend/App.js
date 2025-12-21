@@ -21,7 +21,7 @@ import FlightPathMap from './FlightPathMap';
 const BACKEND_PORT = 5000;
 
 export default function App() {
-  const [backendIP, setBackendIP] = useState('192.168.137.217');
+  const [backendIP, setBackendIP] = useState('192.168.100.47');
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedLogFile, setSelectedLogFile] = useState(null); // Keep for backward compatibility
   const [selectedLogFiles, setSelectedLogFiles] = useState([]); // NEW: Support multiple log files
@@ -40,6 +40,21 @@ export default function App() {
   const [enableAutoAnnotation, setEnableAutoAnnotation] = useState(true); // Toggle YOLO
   const [yoloResults, setYoloResults] = useState(null); // YOLO detection results
   const [currentAnnotationIndex, setCurrentAnnotationIndex] = useState(0); // Current image being reviewed
+  
+  // NEW FEATURES: Orthomosaic Generator & Manual Row Digitizer
+  const [orthomosaicProjects, setOrthomosaicProjects] = useState([]);
+  const [selectedOrthomosaicProject, setSelectedOrthomosaicProject] = useState(null);
+  const [orthomosaicProjectName, setOrthomosaicProjectName] = useState('');
+  const [orthomosaicQuality, setOrthomosaicQuality] = useState('medium');
+  const [orthomosaicFeatureQuality, setOrthomosaicFeatureQuality] = useState('high');
+  const [orthomosaicProcessingStatus, setOrthomosaicProcessingStatus] = useState(null);
+  const [droneImages, setDroneImages] = useState([]);
+  
+  // Manual Row Digitizer states
+  const [digitizerOrthophoto, setDigitizerOrthophoto] = useState(null);
+  const [drawnRows, setDrawnRows] = useState([]);
+  const [currentRow, setCurrentRow] = useState([]);
+  const [isDrawingRow, setIsDrawingRow] = useState(false);
   
   // Progress tracking for batch processing
   const [processingProgress, setProcessingProgress] = useState({
@@ -626,6 +641,10 @@ export default function App() {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
   };
 
+  const removeAllImages = () => {
+    setSelectedImages([]);
+  };
+
   const handleAnalyze = async () => {
     console.log('\n' + '='.repeat(60));
     console.log('🔥 ANALYZE BUTTON CLICKED');
@@ -649,8 +668,13 @@ export default function App() {
       }
     }
 
-    if (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && selectedImages.length === 0) {
+    if (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && analysisType !== 'orthophoto-gaps' && selectedImages.length === 0) {
       showAlert('Error', 'Please select at least one image');
+      return;
+    }
+
+    if (analysisType === 'orthophoto-gaps' && selectedImages.length === 0) {
+      showAlert('Error', 'Please select an orthophoto image');
       return;
     }
 
@@ -936,10 +960,10 @@ export default function App() {
         setSelectedImages([]);
 
         // ===================================================================
-        // ORTHOPHOTO ANALYSIS
+        // ORTHOPHOTO GAP ANALYSIS
         // ===================================================================
-      } else {
-        console.log('🗺️ Processing orthophoto...');
+      } else if (analysisType === 'orthophoto-gaps') {
+        console.log('🗺️ Processing orthophoto gap detection...');
 
         const img = selectedImages[0];
 
@@ -1101,7 +1125,7 @@ export default function App() {
               <Text style={styles.cardEmoji}>🗺️</Text>
               <Text style={styles.cardTitle}>Orthophoto Analysis</Text>
               <Text style={styles.cardDesc}>
-                Detect gaps in large-scale orthophoto imagery
+                Detect gaps, generate orthomosaics, or digitize vineyard rows
               </Text>
             </TouchableOpacity>
 
@@ -1189,9 +1213,12 @@ export default function App() {
             </TouchableOpacity>
             <Text style={styles.topBarTitle}>
               {analysisType === 'drone' ? '📷 Drone' :
-                analysisType === 'orthophoto' ? '🗺️ Orthophoto' :
-                  analysisType === 'image-annotation' ? '🏷️ Annotation' :
-                    analysisType === 'training-dataset' ? '📦 Training Dataset' : '🚁 DJI Log'}
+                analysisType === 'orthophoto' ? '🗺️ Orthophoto Tools' :
+                  analysisType === 'orthophoto-gaps' ? '🔍 Gap Detection' :
+                    analysisType === 'image-annotation' ? '🏷️ Annotation' :
+                      analysisType === 'training-dataset' ? '📦 Training Dataset' :
+                        analysisType === 'generate-orthomosaic' ? '🌍 Generate Orthomosaic' :
+                          analysisType === 'manual-digitizer' ? '📍 Manual Row Digitizer' : '🚁 DJI Log'}
             </Text>
           </View>
 
@@ -1507,16 +1534,593 @@ export default function App() {
                 </View>
               )}
             </>
-          ) : (
+          ) : analysisType === 'generate-orthomosaic' ? (
             <>
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  {analysisType === 'drone' ? 'Select Drone Images' : 'Select Orthophoto'}
-                </Text>
+                <Text style={styles.sectionTitle}>🌍 Generate Orthomosaic</Text>
                 <Text style={styles.sectionDesc}>
-                  {analysisType === 'drone'
-                    ? 'Upload one or more drone images'
-                    : 'Upload your orthophoto image (.tif format)'}
+                  Upload georeferenced images (TIF/JPG) and merge them into a high-quality orthophoto
+                </Text>
+              </View>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoEmoji}>ℹ️</Text>
+                <Text style={styles.infoText}>
+                  Local orthomosaic processor using GDAL. Merges georeferenced images into a single TIF file. Processing 100-500 images takes 5-15 minutes depending on image size and quality settings.
+                </Text>
+              </View>
+
+              {/* Step 1: Create or Select Project */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 1: Project Name</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.projectInput}
+                    placeholder="Enter project name (e.g., vineyard_2024)"
+                    value={orthomosaicProjectName}
+                    onChangeText={setOrthomosaicProjectName}
+                  />
+                  <TouchableOpacity 
+                    style={styles.createProjectBtn}
+                    onPress={() => {
+                      if (orthomosaicProjectName.trim()) {
+                        showAlert('Success', `Project "${orthomosaicProjectName}" is ready`);
+                      } else {
+                        showAlert('Error', 'Please enter a project name');
+                      }
+                    }}
+                  >
+                    <Text style={styles.createProjectText}>Create</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Step 2: Upload Images */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 2: Upload Drone Images</Text>
+                <Text style={styles.sectionDesc}>
+                  Select 20+ overlapping drone images (JPG, PNG). Images should have GPS metadata (EXIF).
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={async () => {
+                  try {
+                    if (Platform.OS === 'web') {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/jpeg,image/jpg,image/png';
+                      input.multiple = true;
+                      input.onchange = (e) => {
+                        const files = Array.from(e.target.files);
+                        const images = files.map(file => ({
+                          uri: URL.createObjectURL(file),
+                          name: file.name,
+                          type: file.type,
+                          size: file.size,
+                          file: file
+                        }));
+                        setDroneImages(images);
+                      };
+                      input.click();
+                    } else {
+                      const result = await DocumentPicker.getDocumentAsync({
+                        type: ['image/jpeg', 'image/jpg', 'image/png'],
+                        multiple: true,
+                        copyToCacheDirectory: true,
+                      });
+                      if (!result.canceled) {
+                        setDroneImages(result.assets);
+                      }
+                    }
+                  } catch (error) {
+                    showAlert('Error', 'Failed to select images: ' + error.message);
+                  }
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>📷</Text>
+                <Text style={styles.uploadText}>
+                  {droneImages.length === 0 ? 'Select Drone Images' : `${droneImages.length} Images Selected`}
+                </Text>
+              </TouchableOpacity>
+
+              {droneImages.length > 0 && (
+                <View style={styles.imagesList}>
+                  <View style={styles.imagesListHeader}>
+                    <Text style={styles.imagesListTitle}>
+                      Selected Images ({droneImages.length})
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => setDroneImages([])}
+                      style={styles.deleteAllBtn}
+                    >
+                      <Text style={styles.deleteAllText}>🗑️ Delete All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    data={droneImages.slice(0, 5)}
+                    scrollEnabled={false}
+                    renderItem={({ item, index }) => (
+                      <View style={styles.imageRow}>
+                        <Image
+                          source={{ uri: item.uri }}
+                          style={styles.imageThumbnail}
+                        />
+                        <Text style={styles.imageName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={styles.imageSize}>
+                          {(item.size / (1024 * 1024)).toFixed(2)} MB
+                        </Text>
+                        <TouchableOpacity onPress={() => {
+                          setDroneImages(droneImages.filter((_, i) => i !== index));
+                        }}>
+                          <Text style={styles.removeIcon}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    keyExtractor={(_, idx) => idx.toString()}
+                  />
+                  {droneImages.length > 5 && (
+                    <View style={styles.moreFilesIndicator}>
+                      <Text style={styles.moreFilesText}>
+                        + {droneImages.length - 5} more images
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Step 3: Quality Settings */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 3: Quality Settings</Text>
+                <Text style={styles.optionLabel}>Processing Quality</Text>
+                <View style={styles.segmentedControl}>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicQuality === 'low' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicQuality('low')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicQuality === 'low' && styles.segmentTextActive]}>
+                      Low (Fast)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicQuality === 'medium' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicQuality('medium')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicQuality === 'medium' && styles.segmentTextActive]}>
+                      Medium
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicQuality === 'high' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicQuality('high')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicQuality === 'high' && styles.segmentTextActive]}>
+                      High
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicQuality === 'ultra' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicQuality('ultra')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicQuality === 'ultra' && styles.segmentTextActive]}>
+                      Ultra (Slow)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.optionLabel}>Feature Quality</Text>
+                <View style={styles.segmentedControl}>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicFeatureQuality === 'low' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicFeatureQuality('low')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicFeatureQuality === 'low' && styles.segmentTextActive]}>
+                      Low
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicFeatureQuality === 'medium' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicFeatureQuality('medium')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicFeatureQuality === 'medium' && styles.segmentTextActive]}>
+                      Medium
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.segment, orthomosaicFeatureQuality === 'high' && styles.segmentActive]}
+                    onPress={() => setOrthomosaicFeatureQuality('high')}
+                  >
+                    <Text style={[styles.segmentText, orthomosaicFeatureQuality === 'high' && styles.segmentTextActive]}>
+                      High
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Step 4: Process Button */}
+              <TouchableOpacity
+                style={[styles.analyzeBtn, (!orthomosaicProjectName || droneImages.length < 5 || loading) && styles.analyzeBtnDisabled]}
+                onPress={async () => {
+                  if (!orthomosaicProjectName) {
+                    showAlert('Error', 'Please enter a project name');
+                    return;
+                  }
+                  if (droneImages.length < 5) {
+                    showAlert('Error', 'Please select at least 5 images (20+ recommended for best results)');
+                    return;
+                  }
+
+                  try {
+                    setLoading(true);
+                    setOrthomosaicProcessingStatus('Creating project...');
+
+                    // Step 1: Create project
+                    const createResponse = await axios.post(`${BACKEND_URL}/orthomosaic/create`, {
+                      project_name: orthomosaicProjectName
+                    });
+
+                    const projectId = createResponse.data.project_id;
+                    setSelectedOrthomosaicProject(createResponse.data);
+                    setOrthomosaicProcessingStatus(`Project created: ${orthomosaicProjectName}`);
+
+                    // Step 2: Upload images in chunks (100 at a time)
+                    setOrthomosaicProcessingStatus(`Preparing to upload ${droneImages.length} images...`);
+                    const chunkSize = 100;
+                    const chunks = [];
+                    for (let i = 0; i < droneImages.length; i += chunkSize) {
+                      chunks.push(droneImages.slice(i, i + chunkSize));
+                    }
+
+                    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+                      const chunk = chunks[chunkIndex];
+                      setOrthomosaicProcessingStatus(
+                        `Uploading batch ${chunkIndex + 1}/${chunks.length} (${chunk.length} images)...`
+                      );
+
+                      const formData = new FormData();
+                      
+                      for (let i = 0; i < chunk.length; i++) {
+                        const img = chunk[i];
+                        
+                        if (Platform.OS === 'web') {
+                          if (img.file) {
+                            formData.append('images', img.file, img.name);
+                          } else {
+                            const response = await fetch(img.uri);
+                            const blob = await response.blob();
+                            formData.append('images', blob, img.name);
+                          }
+                        } else {
+                          formData.append('images', {
+                            uri: img.uri,
+                            type: img.type || 'image/jpeg',
+                            name: img.name,
+                          });
+                        }
+                      }
+
+                      formData.append('project_id', projectId);
+
+                      const uploadResponse = await axios.post(
+                        `${BACKEND_URL}/orthomosaic/upload`,
+                        formData,
+                        {
+                          headers: { 'Content-Type': 'multipart/form-data' },
+                          timeout: 600000, // 10 minutes per chunk
+                        }
+                      );
+                    }
+
+                    setOrthomosaicProcessingStatus('All images uploaded successfully. Starting processing...');
+
+                    // Step 3: Start processing
+                    const processResponse = await axios.post(`${BACKEND_URL}/orthomosaic/process`, {
+                      project_id: projectId,
+                      options: {
+                        quality: orthomosaicQuality,
+                        feature_quality: orthomosaicFeatureQuality,
+                        dsm: true,
+                        dtm: true,
+                        orthophoto_resolution: orthomosaicQuality === 'ultra' ? 2 : orthomosaicQuality === 'high' ? 5 : 10,
+                        use_3dmesh: true
+                      }
+                    });
+
+                    setOrthomosaicProcessingStatus('Processing started! This will take 15-60 minutes depending on image count and quality settings.');
+                    
+                    showAlert(
+                      'Processing Started',
+                      `Processing ${droneImages.length} images with local orthomosaic generator.\n\n` +
+                      `Project: ${orthomosaicProjectName}\n` +
+                      `Quality: ${orthomosaicQuality}\n` +
+                      `Estimated time: ${droneImages.length < 50 ? '15-30' : droneImages.length < 200 ? '30-60' : '60-120'} minutes\n\n` +
+                      `You can check progress in the backend logs.`
+                    );
+
+                    // Show real-time processing dashboard
+                    setResults({
+                      type: 'orthomosaic-processing',
+                      data: {
+                        project_id: projectId,
+                        project_name: orthomosaicProjectName,
+                        status: 'processing',
+                        images_count: droneImages.length,
+                        started_at: new Date().toISOString(),
+                        quality: orthomosaicQuality,
+                        feature_quality: orthomosaicFeatureQuality
+                      }
+                    });
+
+                    // Start polling for status
+                    const statusInterval = setInterval(async () => {
+                      try {
+                        const statusResponse = await axios.get(`${BACKEND_URL}/orthomosaic/status/${projectId}`);
+                        const status = statusResponse.data.status;
+                        
+                        console.log('📊 Status Update:', status);
+                        const progressValue = (status.progress || 0).toFixed(2);
+                        setOrthomosaicProcessingStatus(`Status: ${status.status} - ${progressValue}%`);
+
+                        // Update results with current status
+                        setResults(prev => ({
+                          ...prev,
+                          data: {
+                            ...prev.data,
+                            status: status.status,
+                            progress: status.progress || 0
+                          }
+                        }));
+
+                        if (status.status === 'completed' && status.progress === 100) {
+                          console.log('✅ COMPLETION DETECTED - Switching to download screen');
+                          clearInterval(statusInterval);
+                          setLoading(false);
+                          setOrthomosaicProcessingStatus('Processing complete! Orthomosaic is ready.');
+                          
+                          // Update to completed state - this triggers the download screen
+                          setResults({
+                            type: 'orthomosaic',
+                            data: {
+                              project_id: projectId,
+                              project_name: orthomosaicProjectName,
+                              status: 'completed',
+                              images_count: droneImages.length,
+                              completed_at: status.completed_at || new Date().toISOString(),
+                              quality: orthomosaicQuality
+                            }
+                          });
+                          
+                          showAlert('Success', 'Orthomosaic generation completed successfully!');
+                        } else if (status.status === 'failed') {
+                          clearInterval(statusInterval);
+                          setLoading(false);
+                          setOrthomosaicProcessingStatus('Processing failed. Check backend logs for details.');
+                          showAlert('Error', 'Processing failed: ' + (status.error || 'Unknown error'));
+                        }
+                      } catch (error) {
+                        console.error('Status check error:', error);
+                      }
+                    }, 5000); // Check every 5 seconds
+
+                    setLoading(false);
+
+                  } catch (error) {
+                    setLoading(false);
+                    setOrthomosaicProcessingStatus('Error: ' + error.message);
+                    showAlert('Error', 'Failed to process orthomosaic: ' + error.message);
+                  }
+                }}
+                disabled={!orthomosaicProjectName || droneImages.length < 5 || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.analyzeBtnText}>
+                    🚀 Start Processing
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {orthomosaicProcessingStatus && (
+                <View style={styles.infoBox}>
+                  <Text style={styles.infoEmoji}>⏳</Text>
+                  <Text style={styles.infoText}>
+                    {orthomosaicProcessingStatus}
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : analysisType === 'manual-digitizer' ? (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>📍 Manual Row Digitizer (QGIS-like)</Text>
+                <Text style={styles.sectionDesc}>
+                  Manually digitize vineyard rows on an orthophoto and export as GeoJSON
+                </Text>
+              </View>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoEmoji}>ℹ️</Text>
+                <Text style={styles.infoText}>
+                  Load an orthophoto, then click points to draw vineyard row lines. Each row will be saved as a LineString feature in GeoJSON format.
+                </Text>
+              </View>
+
+              {/* Step 1: Load Orthophoto */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 1: Load Orthophoto</Text>
+                <Text style={styles.sectionDesc}>
+                  Select a georeferenced orthophoto (.tif, .jpg, or .png)
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={pickImages}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>🗺️</Text>
+                <Text style={styles.uploadText}>
+                  {digitizerOrthophoto ? '✓ Orthophoto Loaded' : 'Load Orthophoto'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Step 2: Drawing Canvas */}
+              {digitizerOrthophoto && (
+                <>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Step 2: Digitize Rows</Text>
+                  </View>
+
+                  <View style={styles.drawingCanvas}>
+                    <Image
+                      source={{ uri: digitizerOrthophoto.uri }}
+                      style={styles.orthophotoPreview}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.drawingHint}>
+                      {isDrawingRow ? 'Click to add points, tap "Finish Row" when complete' : 'Tap "Draw Row" to start digitizing'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.drawingControls}>
+                    <TouchableOpacity
+                      style={[styles.drawBtn, isDrawingRow && styles.drawBtnActive]}
+                      onPress={() => {
+                        if (isDrawingRow) {
+                          // Finish current row
+                          if (currentRow.length >= 2) {
+                            setDrawnRows([...drawnRows, currentRow]);
+                            setCurrentRow([]);
+                            setIsDrawingRow(false);
+                            showAlert('Row Completed', `Row ${drawnRows.length + 1} saved`);
+                          } else {
+                            showAlert('Error', 'Need at least 2 points to create a row');
+                          }
+                        } else {
+                          // Start new row
+                          setIsDrawingRow(true);
+                          setCurrentRow([]);
+                        }
+                      }}
+                    >
+                      <Text style={styles.drawBtnText}>
+                        {isDrawingRow ? '✓ Finish Row' : '✏️ Draw Row'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.clearBtn}
+                      onPress={() => {
+                        setDrawnRows([]);
+                        setCurrentRow([]);
+                        setIsDrawingRow(false);
+                        showAlert('Cleared', 'All rows have been cleared');
+                      }}
+                      disabled={drawnRows.length === 0 && currentRow.length === 0}
+                    >
+                      <Text style={styles.clearBtnText}>
+                        🗑️ Clear All
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.rowCount}>
+                    Rows digitized: {drawnRows.length} {currentRow.length > 0 && `(+ 1 in progress)`}
+                  </Text>
+
+                  {/* Step 3: Export GeoJSON */}
+                  {drawnRows.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.analyzeBtn}
+                      onPress={() => {
+                        const geojson = {
+                          type: 'FeatureCollection',
+                          features: drawnRows.map((row, idx) => ({
+                            type: 'Feature',
+                            properties: { row_id: idx + 1 },
+                            geometry: {
+                              type: 'LineString',
+                              coordinates: row
+                            }
+                          }))
+                        };
+                        
+                        // Export GeoJSON
+                        const dataStr = JSON.stringify(geojson, null, 2);
+                        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                        const url = URL.createObjectURL(dataBlob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `digitized_rows_${Date.now()}.geojson`;
+                        link.click();
+                        
+                        showAlert('Success', `Exported ${drawnRows.length} rows as GeoJSON`);
+                      }}
+                    >
+                      <Text style={styles.analyzeBtnText}>
+                        💾 Export GeoJSON
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </>
+          ) : analysisType === 'orthophoto' ? (
+            <>
+              {/* Orthophoto Mode Selection */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>🗺️ Orthophoto Tools</Text>
+                <Text style={styles.sectionDesc}>
+                  Choose your workflow
+                </Text>
+              </View>
+
+              <View style={styles.cardsContainer}>
+                <TouchableOpacity
+                  style={[styles.card]}
+                  onPress={() => setAnalysisType('orthophoto-gaps')}
+                >
+                  <Text style={styles.cardEmoji}>🔍</Text>
+                  <Text style={styles.cardTitle}>Detect Gaps</Text>
+                  <Text style={styles.cardDesc}>
+                    Analyze orthophoto to detect bare soil and gaps in vineyard rows
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.card, styles.cardOrthomosaic]}
+                  onPress={() => setAnalysisType('generate-orthomosaic')}
+                >
+                  <Text style={styles.cardEmoji}>🌍</Text>
+                  <Text style={styles.cardTitle}>Generate Orthomosaic</Text>
+                  <Text style={styles.cardDesc}>
+                    Merge georeferenced images into orthophotos locally
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.card, styles.cardDigitizer]}
+                  onPress={() => setAnalysisType('manual-digitizer')}
+                >
+                  <Text style={styles.cardEmoji}>📍</Text>
+                  <Text style={styles.cardTitle}>Digitize Rows</Text>
+                  <Text style={styles.cardDesc}>
+                    Manually draw vineyard rows on orthophoto and export to GeoJSON
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : analysisType === 'orthophoto-gaps' ? (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Select Orthophoto</Text>
+                <Text style={styles.sectionDesc}>
+                  Upload your orthophoto image (.tif format)
                 </Text>
               </View>
 
@@ -1531,7 +2135,7 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
 
-              {analysisType === 'orthophoto' && (
+              {selectedImages.length > 0 && (
                 <>
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Clustering Method</Text>
@@ -1612,9 +2216,17 @@ export default function App() {
 
               {selectedImages.length > 0 && (
                 <View style={styles.imagesList}>
-                  <Text style={styles.imagesListTitle}>
-                    Selected Images ({selectedImages.length})
-                  </Text>
+                  <View style={styles.imagesListHeader}>
+                    <Text style={styles.imagesListTitle}>
+                      Selected Images ({selectedImages.length})
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={removeAllImages}
+                      style={styles.deleteAllBtn}
+                    >
+                      <Text style={styles.deleteAllText}>🗑️ Delete All</Text>
+                    </TouchableOpacity>
+                  </View>
                   <FlatList
                     data={selectedImages.slice(0, 5)}
                     scrollEnabled={false}
@@ -1667,9 +2279,84 @@ export default function App() {
                 </View>
               )}
             </>
+          ) : (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Select Drone Images</Text>
+                <Text style={styles.sectionDesc}>
+                  Upload one or more drone images
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={pickImages}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>☁️</Text>
+                <Text style={styles.uploadText}>
+                  {selectedImages.length === 0 ? 'Select Images' : `${selectedImages.length} Selected`}
+                </Text>
+              </TouchableOpacity>
+
+              {selectedImages.length > 0 && (
+                <View style={styles.imagesList}>
+                  <View style={styles.imagesListHeader}>
+                    <Text style={styles.imagesListTitle}>
+                      Selected Images ({selectedImages.length})
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={removeAllImages}
+                      style={styles.deleteAllBtn}
+                    >
+                      <Text style={styles.deleteAllText}>🗑️ Delete All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    data={selectedImages.slice(0, 5)}
+                    scrollEnabled={false}
+                    renderItem={({ item, index }) => {
+                      let fileName = item.fileName || item.name;
+                      
+                      if (!fileName) {
+                        if (item.uri.startsWith('blob:')) {
+                          fileName = `Image ${index + 1}.jpg`;
+                        } else {
+                          const uriParts = item.uri.split('/');
+                          fileName = uriParts[uriParts.length - 1].split('#')[0].split('?')[0];
+                        }
+                      }
+
+                      return (
+                        <View style={styles.imageRow}>
+                          <Image
+                            source={{ uri: item.uri }}
+                            style={styles.imageThumbnail}
+                          />
+                          <Text style={styles.imageName} numberOfLines={1}>
+                            {fileName}
+                          </Text>
+                          <TouchableOpacity onPress={() => removeImage(index)}>
+                            <Text style={styles.removeIcon}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    }}
+                    keyExtractor={(_, idx) => idx.toString()}
+                  />
+                  {selectedImages.length > 5 && (
+                    <View style={styles.moreFilesIndicator}>
+                      <Text style={styles.moreFilesText}>
+                        + {selectedImages.length - 5} more images
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
           )}
 
-          {analysisType !== 'manual-annotation' && (
+          {analysisType !== 'manual-annotation' && analysisType !== 'generate-orthomosaic' && analysisType !== 'manual-digitizer' && analysisType !== 'orthophoto' && analysisType !== 'orthophoto-gaps' && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[
@@ -1678,7 +2365,8 @@ export default function App() {
                   (analysisType === 'dji-log' && !selectedLogFile) ||
                   (analysisType === 'image-annotation' && (selectedLogFiles.length === 0 || annotationImages.length === 0)) ||
                   (analysisType === 'training-dataset') ||
-                  (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && selectedImages.length === 0)
+                  (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && analysisType !== 'orthophoto-gaps' && selectedImages.length === 0) ||
+                  (analysisType === 'orthophoto-gaps' && selectedImages.length === 0)
                 ) && styles.analyzeBtnDisabled
               ]}
               onPress={handleAnalyze}
@@ -1687,7 +2375,8 @@ export default function App() {
                 (analysisType === 'dji-log' && !selectedLogFile) ||
                 (analysisType === 'image-annotation' && (selectedLogFiles.length === 0 || annotationImages.length === 0)) ||
                 (analysisType === 'training-dataset') ||
-                (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && selectedImages.length === 0)
+                (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && analysisType !== 'orthophoto-gaps' && selectedImages.length === 0) ||
+                (analysisType === 'orthophoto-gaps' && selectedImages.length === 0)
               }
             >
               {loading ? (
@@ -1725,7 +2414,7 @@ export default function App() {
                     
                     {/* Progress text */}
                     <Text style={styles.progressText}>
-                      {processingProgress.current} / {processingProgress.total} files ({processingProgress.percentage}%)
+                      {processingProgress.current} / {processingProgress.total} files ({processingProgress.percentage.toFixed(2)}%)
                     </Text>
                     
                     {/* Current file */}
@@ -1743,11 +2432,16 @@ export default function App() {
                     )}
                     
                     {/* Elapsed time */}
-                    {processingProgress.startTime && (
-                      <Text style={styles.elapsedTimeText}>
-                        ⏰ Elapsed: {Math.round((Date.now() - processingProgress.startTime) / 1000)}s
-                      </Text>
-                    )}
+                    {processingProgress.startTime && (() => {
+                      const elapsedSeconds = Math.round((Date.now() - processingProgress.startTime) / 1000);
+                      const minutes = Math.floor(elapsedSeconds / 60);
+                      const seconds = elapsedSeconds % 60;
+                      return (
+                        <Text style={styles.elapsedTimeText}>
+                          ⏰ Elapsed: {minutes > 0 ? `${minutes}m ` : ''}{seconds}s
+                        </Text>
+                      );
+                    })()}
                   </View>
                 )}
               </View>
@@ -1764,15 +2458,186 @@ export default function App() {
     <View style={styles.container}>
       <ScrollView>
         <View style={styles.resultsHeader}>
-          <Text style={styles.resultsEmoji}>✅</Text>
+          <Text style={styles.resultsEmoji}>
+            {results.type === 'orthomosaic-processing' ? '⏳' : '✅'}
+          </Text>
           <Text style={styles.resultsTitle}>
             {results.type === 'dji-log' ? 'Parsing Complete' :
-              results.type === 'image-annotation' ? 'Annotation Complete' : 'Analysis Complete'}
+              results.type === 'image-annotation' ? 'Annotation Complete' :
+                results.type === 'orthomosaic-processing' ? 'Processing Orthomosaic...' :
+                  results.type === 'orthomosaic' ? 'Orthomosaic Complete' : 'Analysis Complete'}
           </Text>
         </View>
 
+        {/* REAL-TIME ORTHOMOSAIC PROCESSING DASHBOARD */}
+        {results.type === 'orthomosaic-processing' && (
+          <View style={styles.processingDashboard}>
+            <View style={styles.dashboardHeader}>
+              <Text style={styles.dashboardTitle}>🌍 ODM Photogrammetry Processing</Text>
+              <Text style={styles.dashboardSubtitle}>{results.data.project_name}</Text>
+              <Text style={styles.odmBadge}>🚀 Using OpenDroneMap Engine</Text>
+            </View>
+
+            <View style={styles.progressSection}>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBarFill, { width: `${(results.data.progress || 0).toFixed(2)}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {(results.data.progress || 0).toFixed(2)}% Complete
+              </Text>
+            </View>
+
+            <View style={styles.dashboardMetrics}>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricEmoji}>📷</Text>
+                <Text style={styles.metricValue}>{results.data.images_count}</Text>
+                <Text style={styles.metricLabel}>Images</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricEmoji}>⚙️</Text>
+                <Text style={styles.metricValue}>{results.data.quality}</Text>
+                <Text style={styles.metricLabel}>Quality</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricEmoji}>⏱️</Text>
+                <Text style={styles.metricValue}>
+                  {Math.floor((Date.now() - new Date(results.data.started_at).getTime()) / 60000)}m
+                </Text>
+                <Text style={styles.metricLabel}>Elapsed</Text>
+              </View>
+            </View>
+
+            <View style={styles.statusLog}>
+              <Text style={styles.statusLogTitle}>📋 Processing Status</Text>
+              <View style={styles.statusLogContent}>
+                <Text style={styles.statusLogText}>
+                  Status: {results.data.status}
+                </Text>
+                <Text style={styles.statusLogText}>
+                  {orthomosaicProcessingStatus || 'Initializing...'}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.analyzeBtn, { backgroundColor: '#6B7280' }]}
+              onPress={() => {
+                setResults(null);
+                setAnalysisType(null);
+              }}
+            >
+              <Text style={styles.analyzeBtnText}>Cancel & Go Back</Text>
+            </TouchableOpacity>
+            
+            {/* Download Button (appears when status is completed or failed) */}
+            {(results.data.status === 'completed' || results.data.status === 'failed') && (
+              <TouchableOpacity
+                style={[styles.analyzeBtn, { backgroundColor: '#10B981', marginTop: 12 }]}
+                onPress={async () => {
+                  try {
+                    const response = await fetch(`http://${backendIP}:${BACKEND_PORT}/api/orthomosaic/download/${results.data.project_id}`);
+                    if (!response.ok) {
+                      showAlert('Error', 'Failed to download orthomosaic');
+                      return;
+                    }
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `orthomosaic_${results.data.project_id}.tif`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    showAlert('Success', 'Orthomosaic downloaded!');
+                  } catch (error) {
+                    console.error('Download error:', error);
+                    showAlert('Error', 'Download failed: ' + error.message);
+                  }
+                }}
+              >
+                <Text style={styles.analyzeBtnText}>📥 Download Orthomosaic</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ORTHOMOSAIC COMPLETE */}
+        {results.type === 'orthomosaic' && (
+          <View style={styles.orthomosaicResults}>
+            <View style={styles.successBanner}>
+              <Text style={styles.successEmoji}>🎉</Text>
+              <Text style={styles.successText}>
+                Orthomosaic Generated Successfully!
+              </Text>
+            </View>
+
+            <View style={styles.projectInfo}>
+              <Text style={styles.projectInfoTitle}>Project Details</Text>
+              <View style={styles.projectInfoRow}>
+                <Text style={styles.projectInfoLabel}>Name:</Text>
+                <Text style={styles.projectInfoValue}>{results.data.project_name}</Text>
+              </View>
+              <View style={styles.projectInfoRow}>
+                <Text style={styles.projectInfoLabel}>Images:</Text>
+                <Text style={styles.projectInfoValue}>{results.data.images_count}</Text>
+              </View>
+              <View style={styles.projectInfoRow}>
+                <Text style={styles.projectInfoLabel}>Quality:</Text>
+                <Text style={styles.projectInfoValue}>{results.data.quality}</Text>
+              </View>
+              <View style={styles.projectInfoRow}>
+                <Text style={styles.projectInfoLabel}>Completed:</Text>
+                <Text style={styles.projectInfoValue}>
+                  {new Date(results.data.completed_at).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.downloadSection}>
+              <Text style={styles.downloadTitle}>📥 Download Outputs</Text>
+              <Text style={styles.downloadDesc}>
+                Click below to download your georeferenced orthomosaic
+              </Text>
+              
+              <TouchableOpacity
+                style={[styles.analyzeBtn, { backgroundColor: '#10B981', marginTop: 16 }]}
+                onPress={async () => {
+                  try {
+                    console.log('Downloading orthomosaic for project:', results.data.project_id);
+                    
+                    if (Platform.OS === 'web') {
+                      // Web download
+                      const downloadUrl = `http://${backendIP}:${BACKEND_PORT}/api/orthomosaic/download/${results.data.project_id}`;
+                      console.log('Download URL:', downloadUrl);
+                      
+                      const a = document.createElement('a');
+                      a.href = downloadUrl;
+                      a.download = `${results.data.project_name}_orthomosaic.tif`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      
+                      showAlert('Success', 'Download started! Check your downloads folder.');
+                    } else {
+                      // Mobile - show alert with file location
+                      showAlert('Info', `File location:\nbackend/orthomosaic_projects/${results.data.project_id}/output/orthomosaic.tif`);
+                    }
+                  } catch (error) {
+                    console.error('Download error:', error);
+                    showAlert('Error', 'Download failed: ' + error.message);
+                  }
+                }}
+              >
+                <Text style={styles.analyzeBtnText}>📥 Download Orthomosaic.TIF</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* DOWNLOAD BUTTONS */}
-        {Platform.OS === 'web' && (
+        {Platform.OS === 'web' && results.type !== 'orthomosaic-processing' && results.type !== 'orthomosaic' && (
           <View style={styles.downloadSection}>
             <Text style={styles.downloadTitle}>📥 Download Results</Text>
             <View style={styles.downloadButtons}>
@@ -2360,7 +3225,7 @@ export default function App() {
                 </View>
               ))}
             </>
-          ) : (
+          ) : results.type !== 'orthomosaic-processing' && results.type !== 'orthomosaic' ? (
             <>
               <View style={styles.metricBox}>
                 <Text style={styles.metricLabel}>Clustering Method</Text>
@@ -2405,7 +3270,7 @@ export default function App() {
                 </View>
               ))}
             </>
-          )}
+          ) : null}
         </View>
 
         <TouchableOpacity style={styles.newAnalysisBtn} onPress={resetApp}>
@@ -2696,11 +3561,27 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 20,
   },
+  imagesListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   imagesListTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1a472a',
-    marginBottom: 12,
+  },
+  deleteAllBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#ff4444',
+    borderRadius: 6,
+  },
+  deleteAllText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   imageRow: {
     flexDirection: 'row',
@@ -2720,6 +3601,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#333',
+  },
+  imageSize: {
+    fontSize: 11,
+    color: '#888',
+    marginRight: 8,
   },
   removeIcon: {
     fontSize: 18,
@@ -3735,5 +4621,284 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 4,
     textAlign: 'center',
+  },
+  // New feature styles
+  cardOrthomosaic: {
+    backgroundColor: '#C7F9CC',
+    borderLeftWidth: 6,
+    borderLeftColor: '#10B981',
+  },
+  cardDigitizer: {
+    backgroundColor: '#DBEAFE',
+    borderLeftWidth: 6,
+    borderLeftColor: '#3B82F6',
+  },
+  projectInput: {
+    flex: 1,
+    height: 48,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  createProjectBtn: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 20,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  createProjectText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  optionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentActive: {
+    backgroundColor: '#3B82F6',
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  segmentTextActive: {
+    color: '#fff',
+  },
+  drawingCanvas: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    minHeight: 300,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orthophotoPreview: {
+    width: '100%',
+    height: 250,
+    borderRadius: 8,
+  },
+  drawingHint: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  drawingControls: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  drawBtn: {
+    flex: 1,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  drawBtnActive: {
+    backgroundColor: '#10B981',
+  },
+  drawBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  clearBtn: {
+    flex: 1,
+    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  clearBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  rowCount: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  // Orthomosaic Processing Dashboard
+  processingDashboard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    margin: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dashboardHeader: {
+    marginBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#E5E7EB',
+    paddingBottom: 16,
+  },
+  dashboardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  dashboardSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  odmBadge: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600',
+    marginTop: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  progressSection: {
+    marginBottom: 24,
+  },
+  dashboardMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  metricEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  statusLog: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  statusLogTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  statusLogContent: {
+    gap: 8,
+  },
+  statusLogText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  // Orthomosaic Results
+  orthomosaicResults: {
+    padding: 16,
+  },
+  successBanner: {
+    backgroundColor: '#D1FAE5',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  successEmoji: {
+    fontSize: 48,
+    marginBottom: 8,
+  },
+  successText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  projectInfo: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  projectInfoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  projectInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  projectInfoLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  projectInfoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  downloadDesc: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 8,
   },
 });
