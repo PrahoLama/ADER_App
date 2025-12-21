@@ -2668,6 +2668,70 @@ app.delete('/api/orthomosaic/project/:project_id', async (req, res) => {
   }
 });
 
+// ==================== TIFF TO PNG CONVERTER ====================
+// Endpoint to convert TIFF files to PNG for browser display
+
+app.post('/api/convert-tiff', upload.single('tiff'), async (req, res) => {
+  console.log('📸 TIFF Conversion request received');
+  
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const tiffPath = req.file.path;
+    const outputFilename = `${path.basename(req.file.originalname, path.extname(req.file.originalname))}.png`;
+    const outputPath = path.join(uploadDir, outputFilename);
+
+    console.log('📂 Converting:', req.file.originalname);
+    console.log('📂 Output:', outputFilename);
+
+    // Parse geospatial bounds if provided
+    let bounds = null;
+    if (req.body.bounds) {
+      try {
+        bounds = JSON.parse(req.body.bounds);
+        console.log('✅ Received geospatial bounds:', bounds);
+      } catch (e) {
+        console.warn('⚠️ Could not parse bounds:', e);
+      }
+    }
+
+    // Convert TIFF to PNG using sharp
+    await sharp(tiffPath)
+      .png({
+        compressionLevel: 6,
+        adaptiveFiltering: true
+      })
+      .toFile(outputPath);
+
+    console.log('✅ Conversion successful');
+
+    // Return the converted image as base64
+    const imageBuffer = fs.readFileSync(outputPath);
+    const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+
+    // Clean up original TIFF
+    fs.unlinkSync(tiffPath);
+
+    res.json({
+      success: true,
+      filename: outputFilename,
+      path: `/uploads/${outputFilename}`,
+      base64: base64Image,
+      bounds: bounds, // Return bounds back to frontend
+      message: 'TIFF converted to PNG successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ TIFF conversion error:', error);
+    res.status(500).json({ 
+      error: 'Failed to convert TIFF', 
+      details: error.message 
+    });
+  }
+});
+
 // ==================== START SERVER ====================
 
 app.listen(PORT, '0.0.0.0', () => {

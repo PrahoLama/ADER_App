@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import axios from 'axios';
 import FlightPathMap from './FlightPathMap';
+import { fromArrayBuffer } from 'geotiff';
 
 const BACKEND_PORT = 5000;
 
@@ -55,6 +55,24 @@ export default function App() {
   const [drawnRows, setDrawnRows] = useState([]);
   const [currentRow, setCurrentRow] = useState([]);
   const [isDrawingRow, setIsDrawingRow] = useState(false);
+  const [geoBounds, setGeoBounds] = useState(null); // Store actual GeoTIFF bounds
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPanPoint, setLastPanPoint] = useState(null);
+  const canvasRef = useRef(null);
+  
+  // Manual Annotation Tool states (LabelImg-like)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [annotations, setAnnotations] = useState([]); // Array of {imageId, boxes: [{x, y, width, height, label, type: 'manual'|'yolo'}]}
+  const [currentBox, setCurrentBox] = useState(null); // Currently drawing box
+  const [isDrawingBox, setIsDrawingBox] = useState(false);
+  const [selectedLabel, setSelectedLabel] = useState('vine');
+  const [customLabels, setCustomLabels] = useState(['vine', 'dead_vine', 'gap', 'soil', 'vegetation']);
+  const [selectedBoxIndex, setSelectedBoxIndex] = useState(null);
+  const [showLabelInput, setShowLabelInput] = useState(false);
+  const [newLabelText, setNewLabelText] = useState('');
+  const annotationCanvasRef = useRef(null);
   
   // Progress tracking for batch processing
   const [processingProgress, setProcessingProgress] = useState({
@@ -71,6 +89,428 @@ export default function App() {
   useEffect(() => {
     checkBackendHealth();
   }, [backendIP]);
+
+  // Canvas rendering for manual digitizer
+  useEffect(() => {
+    if (!canvasRef.current || !digitizerOrthophoto) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    console.log('📊 Loading orthophoto:', digitizerOrthophoto.name);
+    
+    // Load and draw the orthophoto
+    const img = new window.Image();
+    img.onload = () => {
+      console.log('✅ Image loaded successfully:', img.width, 'x', img.height);
+      
+      // Set canvas resolution to match image dimensions for crisp rendering
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Set display size (CSS will scale, but high-res canvas prevents blur)
+      const containerWidth = canvas.parentElement.offsetWidth;
+      const aspectRatio = img.height / img.width;
+      canvas.style.width = '100%';
+      canvas.style.height = (containerWidth * aspectRatio) + 'px';
+      
+      // Save context and apply transformations
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Apply zoom and pan transformations
+      ctx.translate(panOffset.x, panOffset.y);
+      ctx.scale(zoomLevel, zoomLevel);
+      
+      // Draw orthophoto at native resolution
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      // Draw all completed rows in red
+      drawnRows.forEach((row, idx) => {
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 3 / zoomLevel; // Adjust line width for zoom
+        ctx.beginPath();
+        row.points.forEach((point, i) => {
+          if (i === 0) {
+            ctx.moveTo(point.x, point.y);
+          } else {
+            ctx.lineTo(point.x, point.y);
+          }
+        });
+        ctx.stroke();
+        
+        // Draw row number label at the midpoint with background
+        if (row.points.length >= 2) {
+          const midIdx = Math.floor(row.points.length / 2);
+          const midPoint = row.points[midIdx];
+          
+          // Draw label background
+          const text = `Row ${row.number}`;
+          ctx.font = `bold ${14 / zoomLevel}px Arial`;
+          const textWidth = ctx.measureText(text).width;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.fillRect(midPoint.x + 8 / zoomLevel, midPoint.y - 18 / zoomLevel, textWidth + 8 / zoomLevel, 20 / zoomLevel);
+          
+          // Draw label text
+          ctx.fillStyle = '#FF0000';
+          ctx.fillText(text, midPoint.x + 12 / zoomLevel, midPoint.y - 4 / zoomLevel);
+        }
+        
+        // Draw points as circles with white border (QGIS style)
+        row.points.forEach(point => {
+          // White border
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2 / zoomLevel;
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 6 / zoomLevel, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          // Red fill
+          ctx.fillStyle = '#FF0000';
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 4 / zoomLevel, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      });
+      
+      // Draw current row being drawn (in yellow)
+      if (currentRow.length > 0) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3 / zoomLevel;
+        ctx.beginPath();
+        currentRow.forEach((point, i) => {
+          if (i === 0) {
+            ctx.moveTo(point.x, point.y);
+          } else {
+            ctx.lineTo(point.x, point.y);
+          }
+        });
+        ctx.stroke();
+        
+        // Draw points with white border (QGIS style)
+        currentRow.forEach(point => {
+          // White border
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2 / zoomLevel;
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 6 / zoomLevel, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          // Yellow fill
+          ctx.fillStyle = '#FFD700';
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 4 / zoomLevel, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      }
+      
+      ctx.restore();
+    };
+    img.onerror = (e) => {
+      console.error('❌ Failed to load image:', e);
+      showAlert('Error', 'Failed to load orthophoto image. Make sure it is a valid image file.');
+    };
+    img.src = digitizerOrthophoto.uri;
+  }, [digitizerOrthophoto, drawnRows, currentRow, zoomLevel, panOffset]);
+
+  // Canvas click handler for manual digitizer
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    let lastClickTime = 0;
+    
+    const handleClick = (e) => {
+      if (!isDrawingRow) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      
+      // Calculate scaled coordinates (account for CSS scaling)
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      // Apply zoom and pan inverse transformations
+      const x = ((e.clientX - rect.left) * scaleX - panOffset.x) / zoomLevel;
+      const y = ((e.clientY - rect.top) * scaleY - panOffset.y) / zoomLevel;
+      
+      console.log('Click:', { clientX: e.clientX, clientY: e.clientY, x, y, zoom: zoomLevel, pan: panOffset });
+      
+      // Check for double-click
+      const now = Date.now();
+      if (now - lastClickTime < 300 && currentRow.length >= 2) {
+        // Double-click: finish row
+        setDrawnRows([...drawnRows, { 
+          id: `row_${drawnRows.length + 1}`,
+          points: currentRow,
+          number: drawnRows.length + 1
+        }]);
+        setCurrentRow([]);
+        setIsDrawingRow(false);
+        showAlert('Row Completed', `Row ${drawnRows.length + 1} saved. Click "Draw New Row" to continue.`);
+        return;
+      }
+      lastClickTime = now;
+      
+      // Single click: add point
+      setCurrentRow([...currentRow, { x, y }]);
+    };
+    
+    // Mouse wheel zoom
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.min(Math.max(0.1, zoomLevel * delta), 10);
+      
+      // Zoom towards mouse cursor
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+      
+      const newPanX = mouseX - (mouseX - panOffset.x) * (newZoom / zoomLevel);
+      const newPanY = mouseY - (mouseY - panOffset.y) * (newZoom / zoomLevel);
+      
+      setZoomLevel(newZoom);
+      setPanOffset({ x: newPanX, y: newPanY });
+    };
+    
+    // Pan with middle mouse or space+drag
+    const handleMouseDown = (e) => {
+      if (e.button === 1 || e.button === 2 || (e.button === 0 && !isDrawingRow)) { // Middle, right, or left when not drawing
+        e.preventDefault();
+        setIsPanning(true);
+        setLastPanPoint({ x: e.clientX, y: e.clientY });
+        canvas.style.cursor = 'grabbing';
+      }
+    };
+    
+    const handleMouseMove = (e) => {
+      if (isPanning && lastPanPoint) {
+        e.preventDefault();
+        const dx = e.clientX - lastPanPoint.x;
+        const dy = e.clientY - lastPanPoint.y;
+        setPanOffset({ 
+          x: panOffset.x + dx,
+          y: panOffset.y + dy
+        });
+        setLastPanPoint({ x: e.clientX, y: e.clientY });
+      }
+    };
+    
+    const handleMouseUp = (e) => {
+      if (isPanning) {
+        setIsPanning(false);
+        setLastPanPoint(null);
+        canvas.style.cursor = isDrawingRow ? 'crosshair' : 'grab';
+      }
+    };
+    
+    const handleContextMenu = (e) => {
+      e.preventDefault(); // Prevent right-click menu
+    };
+    
+    canvas.addEventListener('click', handleClick);
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('mouseleave', handleMouseUp);
+    canvas.addEventListener('contextmenu', handleContextMenu);
+    
+    return () => {
+      canvas.removeEventListener('click', handleClick);
+      canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('mouseleave', handleMouseUp);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [isDrawingRow, currentRow, drawnRows, zoomLevel, panOffset, isPanning, lastPanPoint]);
+
+  // Manual Annotation Canvas Logic
+  useEffect(() => {
+    try {
+      if (analysisType !== 'manual-annotation') return;
+      if (!annotationCanvasRef.current || annotationImages.length === 0) return;
+      
+      const canvas = annotationCanvasRef.current;
+      if (!canvas || !canvas.getContext) {
+        console.warn('Canvas not available');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get 2D context');
+        return;
+      }
+      
+      const currentImage = annotationImages[currentImageIndex];
+      
+      if (!currentImage || !currentImage.uri) {
+        console.warn('No current image or URI');
+        return;
+      }
+      
+      console.log('Loading image:', currentImage.name);
+      
+      const img = typeof window !== 'undefined' && window.Image ? new window.Image() : new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        try {
+          console.log('Image loaded successfully:', img.width, 'x', img.height);
+          
+          // Scale down large images to fit on screen (max 1200px width)
+          const maxWidth = 1200;
+          let displayWidth = img.width;
+          let displayHeight = img.height;
+          let scale = 1;
+          
+          if (img.width > maxWidth) {
+            scale = maxWidth / img.width;
+            displayWidth = maxWidth;
+            displayHeight = img.height * scale;
+          }
+          
+          canvas.width = displayWidth;
+          canvas.height = displayHeight;
+          
+          // Draw image scaled
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+          
+          // Store scale for coordinate calculations
+          canvas.dataset.scale = scale;
+          canvas.dataset.originalWidth = img.width;
+          canvas.dataset.originalHeight = img.height;
+          
+          // Draw existing boxes (scaled)
+          const currentAnnotations = annotations[currentImageIndex]?.boxes || [];
+          currentAnnotations.forEach((box, idx) => {
+            const isSelected = idx === selectedBoxIndex;
+            const color = box.type === 'yolo' ? '#3b82f6' : '#10b981';
+            
+            ctx.strokeStyle = isSelected ? '#fbbf24' : color;
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.strokeRect(box.x * scale, box.y * scale, box.width * scale, box.height * scale);
+            
+            // Draw label background
+            ctx.fillStyle = isSelected ? '#fbbf24' : color;
+            const labelText = `${box.label}`;
+            ctx.font = '14px Arial';
+            const textWidth = ctx.measureText(labelText).width;
+            ctx.fillRect(box.x * scale, box.y * scale - 20, textWidth + 8, 20);
+            
+            // Draw label text
+            ctx.fillStyle = '#fff';
+            ctx.fillText(labelText, box.x * scale + 4, box.y * scale - 6);
+          });
+          
+          // Draw current box being drawn (scaled)
+          if (currentBox) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(currentBox.x * scale, currentBox.y * scale, currentBox.width * scale, currentBox.height * scale);
+            ctx.setLineDash([]);
+          }
+          
+          console.log('Canvas rendered successfully');
+        } catch (error) {
+          console.error('Error drawing on canvas:', error);
+        }
+      };
+      
+      img.onerror = (error) => {
+        console.error('Error loading image:', currentImage.name, error);
+        alert('Failed to load image: ' + currentImage.name);
+      };
+      
+      img.src = currentImage.uri;
+    } catch (error) {
+      console.error('❌ Critical error in annotation useEffect:', error);
+    }
+    
+    let startX, startY;
+    
+    const handleMouseDown = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      
+      // Check if clicking on existing box
+      const currentAnnotations = annotations[currentImageIndex]?.boxes || [];
+      const clickedBoxIndex = currentAnnotations.findIndex(box =>
+        x >= box.x && x <= box.x + box.width &&
+        y >= box.y && y <= box.y + box.height
+      );
+      
+      if (clickedBoxIndex !== -1) {
+        setSelectedBoxIndex(clickedBoxIndex);
+      } else {
+        // Start drawing new box
+        setIsDrawingBox(true);
+        startX = x;
+        startY = y;
+        setSelectedBoxIndex(null);
+      }
+    };
+    
+    const handleMouseMove = (e) => {
+      if (!isDrawingBox) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      
+      const width = x - startX;
+      const height = y - startY;
+      
+      setCurrentBox({ x: startX, y: startY, width, height });
+    };
+    
+    const handleMouseUp = (e) => {
+      if (!isDrawingBox || !currentBox) return;
+      
+      if (Math.abs(currentBox.width) > 10 && Math.abs(currentBox.height) > 10) {
+        const normalizedBox = {
+          x: currentBox.width < 0 ? currentBox.x + currentBox.width : currentBox.x,
+          y: currentBox.height < 0 ? currentBox.y + currentBox.height : currentBox.y,
+          width: Math.abs(currentBox.width),
+          height: Math.abs(currentBox.height),
+          label: selectedLabel,
+          type: 'manual'
+        };
+        
+        const updated = [...annotations];
+        if (!updated[currentImageIndex]) {
+          updated[currentImageIndex] = { imageId: currentImageIndex, imageName: annotationImages[currentImageIndex].name, boxes: [] };
+        }
+        updated[currentImageIndex].boxes.push(normalizedBox);
+        setAnnotations(updated);
+      }
+      
+      setIsDrawingBox(false);
+      setCurrentBox(null);
+    };
+    
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('mouseleave', handleMouseUp);
+    
+    return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('mouseleave', handleMouseUp);
+    };
+  }, [annotationImages, currentImageIndex, annotations, selectedBoxIndex, currentBox, isDrawingBox]);
 
   const checkBackendHealth = async () => {
     console.log('🔍 Checking backend health at:', `http://${backendIP}:${BACKEND_PORT}/api/health`);
@@ -678,6 +1118,11 @@ export default function App() {
       return;
     }
 
+    if (analysisType === 'orthophoto-gaps' && !rowsGeojson) {
+      showAlert('Rows GeoJSON Required', 'Please upload a rows.geojson file for gap detection analysis');
+      return;
+    }
+
     if (backendStatus !== 'connected') {
       showAlert(
         'Backend Not Running',
@@ -1164,6 +1609,19 @@ export default function App() {
               <Text style={styles.cardTitle}>Training Dataset JSON</Text>
               <Text style={styles.cardDesc}>
                 Generate comprehensive training dataset with DJI metadata + YOLO detection boxes in JSON format
+              </Text>
+            </TouchableOpacity>
+
+            {/* Manual Annotation Tool (LabelImg-like) */}
+            <TouchableOpacity
+              style={[styles.card, styles.cardManualAnnotation, backendStatus !== 'connected' && styles.cardDisabled]}
+              onPress={() => backendStatus === 'connected' && setAnalysisType('manual-annotation')}
+              disabled={backendStatus !== 'connected'}
+            >
+              <Text style={styles.cardEmoji}>✏️</Text>
+              <Text style={styles.cardTitle}>Manual Annotation Tool</Text>
+              <Text style={styles.cardDesc}>
+                Draw bounding boxes, add labels, edit or delete YOLO annotations. Export to JSON format
               </Text>
             </TouchableOpacity>
           </View>
@@ -1934,19 +2392,264 @@ export default function App() {
                 </View>
               )}
             </>
-          ) : analysisType === 'manual-digitizer' ? (
+          ) : analysisType === 'manual-annotation' ? (
             <>
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>📍 Manual Row Digitizer (QGIS-like)</Text>
+                <Text style={styles.sectionTitle}>✏️ Manual Annotation Tool</Text>
                 <Text style={styles.sectionDesc}>
-                  Manually digitize vineyard rows on an orthophoto and export as GeoJSON
+                  Draw bounding boxes, add labels, edit or delete existing annotations
                 </Text>
               </View>
 
               <View style={styles.infoBox}>
+                <Text style={styles.infoEmoji}>💡</Text>
+                <Text style={styles.infoText}>
+                  Load images with existing YOLO annotations or start fresh. Draw boxes by click-drag. Edit labels, delete boxes, and export to JSON.
+                </Text>
+              </View>
+
+              {/* Step 1: Load Images */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 1: Load Images</Text>
+                <Text style={styles.sectionDesc}>
+                  Upload images to annotate (.jpg, .png, .tif)
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={async () => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.multiple = true;
+                  input.accept = '.jpg,.jpeg,.png,.tif,.tiff';
+                  input.onchange = async (e) => {
+                    try {
+                      const files = Array.from(e.target.files);
+                      if (files.length === 0) return;
+                      
+                      const imageData = files.map(file => ({
+                        uri: URL.createObjectURL(file),
+                        name: file.name,
+                        file: file
+                      }));
+                      
+                      // Initialize empty annotations for each image first
+                      const initialAnnotations = imageData.map((img, idx) => ({
+                        imageId: idx,
+                        imageName: img.name,
+                        boxes: []
+                      }));
+                      
+                      setAnnotations(initialAnnotations);
+                      setAnnotationImages(imageData);
+                      setCurrentImageIndex(0);
+                      setSelectedBoxIndex(-1);
+                      
+                      console.log('✅ Loaded images:', imageData.length);
+                    } catch (error) {
+                      console.error('Error loading images:', error);
+                      alert('Error loading images: ' + error.message);
+                    }
+                  };
+                  input.click();
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>🖼️</Text>
+                <Text style={styles.uploadText}>
+                  {annotationImages.length === 0 ? 'Select Images' : `${annotationImages.length} Images Loaded`}
+                </Text>
+              </TouchableOpacity>
+
+              {annotationImages.length > 0 && (
+                <>
+                  {/* Image Navigation */}
+                  <View style={styles.imageNavigation}>
+                    <TouchableOpacity
+                      style={[styles.navBtn, currentImageIndex === 0 && styles.navBtnDisabled]}
+                      onPress={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
+                      disabled={currentImageIndex === 0}
+                    >
+                      <Text style={styles.navBtnText}>← Previous</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.imageCounter}>
+                      {currentImageIndex + 1} / {annotationImages.length}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.navBtn, currentImageIndex === annotationImages.length - 1 && styles.navBtnDisabled]}
+                      onPress={() => setCurrentImageIndex(Math.min(annotationImages.length - 1, currentImageIndex + 1))}
+                      disabled={currentImageIndex === annotationImages.length - 1}
+                    >
+                      <Text style={styles.navBtnText}>Next →</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.annotationWorkspace}>
+                    {/* Canvas for drawing */}
+                    <View style={styles.canvasSection}>
+                      <Text style={styles.imageName}>{annotationImages[currentImageIndex]?.name}</Text>
+                      <Text style={{ color: '#fff', padding: 10, backgroundColor: '#333' }}>
+                        Debug: Images loaded: {annotationImages.length}, Current: {currentImageIndex + 1}
+                      </Text>
+                      {Platform.OS === 'web' && (
+                        <View
+                          ref={(el) => {
+                            if (el && !annotationCanvasRef.current && typeof document !== 'undefined') {
+                              try {
+                                const canvas = document.createElement('canvas');
+                                canvas.style.border = '2px solid #334155';
+                                canvas.style.borderRadius = '8px';
+                                canvas.style.maxWidth = '100%';
+                                canvas.style.cursor = isDrawingBox ? 'crosshair' : 'default';
+                                canvas.style.backgroundColor = '#1a1a1a';
+                                canvas.style.display = 'block';
+                                el.appendChild(canvas);
+                                annotationCanvasRef.current = canvas;
+                                console.log('✅ Canvas created and appended to DOM');
+                              } catch (error) {
+                                console.error('❌ Failed to create canvas:', error);
+                              }
+                            }
+                            if (el && annotationCanvasRef.current) {
+                              annotationCanvasRef.current.style.cursor = isDrawingBox ? 'crosshair' : 'default';
+                            }
+                          }}
+                          style={{ width: '100%', minHeight: 400, backgroundColor: '#0a0a0a' }}
+                        />
+                      )}
+                      <Text style={styles.canvasHint}>
+                        Click and drag to draw bounding boxes • Click on box to select/delete
+                      </Text>
+                    </View>
+
+                    {/* Label Selection Panel */}
+                    <View style={styles.labelPanel}>
+                      <Text style={styles.panelTitle}>Labels</Text>
+                      <View style={styles.labelGrid}>
+                        {customLabels.map((label, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            style={[styles.labelChip, selectedLabel === label && styles.labelChipActive]}
+                            onPress={() => setSelectedLabel(label)}
+                          >
+                            <Text style={[styles.labelChipText, selectedLabel === label && styles.labelChipTextActive]}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      
+                      {/* Add Custom Label */}
+                      <TouchableOpacity
+                        style={styles.addLabelBtn}
+                        onPress={() => setShowLabelInput(!showLabelInput)}
+                      >
+                        <Text style={styles.addLabelText}>+ Add Custom Label</Text>
+                      </TouchableOpacity>
+
+                      {showLabelInput && (
+                        <View style={styles.labelInputContainer}>
+                          <TextInput
+                            style={styles.labelInput}
+                            placeholder="Enter label name"
+                            value={newLabelText}
+                            onChangeText={setNewLabelText}
+                          />
+                          <TouchableOpacity
+                            style={styles.saveLabelBtn}
+                            onPress={() => {
+                              if (newLabelText.trim() && !customLabels.includes(newLabelText.trim())) {
+                                setCustomLabels([...customLabels, newLabelText.trim()]);
+                                setSelectedLabel(newLabelText.trim());
+                                setNewLabelText('');
+                                setShowLabelInput(false);
+                              }
+                            }}
+                          >
+                            <Text style={styles.saveLabelText}>Save</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {/* Annotations List */}
+                      <Text style={styles.panelTitle}>Annotations ({annotations[currentImageIndex]?.boxes.length || 0})</Text>
+                      <ScrollView style={styles.annotationsList}>
+                        {annotations[currentImageIndex]?.boxes.map((box, idx) => (
+                          <View key={idx} style={[styles.annotationItem, selectedBoxIndex === idx && styles.annotationItemSelected]}>
+                            <TouchableOpacity 
+                              style={{ flex: 1 }}
+                              onPress={() => setSelectedBoxIndex(selectedBoxIndex === idx ? null : idx)}
+                            >
+                              <Text style={styles.annotationLabel}>
+                                {box.type === 'yolo' ? '🤖' : '✏️'} {box.label}
+                              </Text>
+                              <Text style={styles.annotationCoords}>
+                                x:{Math.round(box.x)} y:{Math.round(box.y)} w:{Math.round(box.width)} h:{Math.round(box.height)}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.deleteBoxBtn}
+                              onPress={() => {
+                                const updated = [...annotations];
+                                updated[currentImageIndex].boxes.splice(idx, 1);
+                                setAnnotations(updated);
+                                setSelectedBoxIndex(null);
+                              }}
+                            >
+                              <Text style={styles.deleteBoxText}>✕</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
+
+                      {/* Export Button */}
+                      <TouchableOpacity
+                        style={styles.exportAnnotationsBtn}
+                        onPress={() => {
+                          const exportData = {
+                            version: '1.0',
+                            timestamp: new Date().toISOString(),
+                            images: annotations.map(img => ({
+                              imageName: img.imageName,
+                              imageId: img.imageId,
+                              annotations: img.boxes.map(box => ({
+                                label: box.label,
+                                type: box.type,
+                                bbox: {
+                                  x: box.x,
+                                  y: box.y,
+                                  width: box.width,
+                                  height: box.height
+                                }
+                              }))
+                            }))
+                          };
+                          
+                          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `annotations_${new Date().getTime()}.json`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          showAlert('Success', 'Annotations exported to JSON');
+                        }}
+                        disabled={annotations.every(img => img.boxes.length === 0)}
+                      >
+                        <Text style={styles.exportAnnotationsText}>💾 Export JSON</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              )}
+            </>
+          ) : analysisType === 'manual-digitizer' ? (
+            <>
+              <View style={styles.infoBox}>
                 <Text style={styles.infoEmoji}>ℹ️</Text>
                 <Text style={styles.infoText}>
-                  Load an orthophoto, then click points to draw vineyard row lines. Each row will be saved as a LineString feature in GeoJSON format.
+                  Load a georeferenced orthophoto, then draw lines to mark vineyard rows. Click to add points along each row, double-click to finish. Rows will be numbered automatically.
                 </Text>
               </View>
 
@@ -1954,53 +2657,267 @@ export default function App() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Step 1: Load Orthophoto</Text>
                 <Text style={styles.sectionDesc}>
-                  Select a georeferenced orthophoto (.tif, .jpg, or .png)
+                  Select an orthophoto (TIFF will be auto-converted to PNG, or use PNG/JPG directly)
                 </Text>
               </View>
 
               <TouchableOpacity
                 style={styles.uploadBtn}
-                onPress={pickImages}
+                onPress={async () => {
+                  try {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.tif,.tiff,.png,.jpg,.jpeg';
+                    input.onchange = async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      
+                      // Check if it's a TIFF file
+                      if (file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
+                        setLoading(true);
+                        showAlert('Processing...', 'Converting TIFF and extracting coordinates...');
+                        
+                        try {
+                          // First, extract GeoTIFF metadata
+                          const arrayBuffer = await file.arrayBuffer();
+                          let extractedBounds = null;
+                          try {
+                            const tiff = await fromArrayBuffer(arrayBuffer);
+                            const image = await tiff.getImage();
+                            const bbox = image.getBoundingBox();
+                            
+                            if (bbox && bbox.length === 4) {
+                              extractedBounds = {
+                                minLng: bbox[0],
+                                minLat: bbox[1],
+                                maxLng: bbox[2],
+                                maxLat: bbox[3]
+                              };
+                              setGeoBounds(extractedBounds);
+                              console.log('✅ Extracted GeoTIFF bounds:', bbox);
+                            } else {
+                              console.warn('⚠️ No geospatial info found, using default bounds');
+                              setGeoBounds(null);
+                            }
+                          } catch (geoErr) {
+                            console.warn('⚠️ Could not extract geospatial info:', geoErr);
+                            setGeoBounds(null);
+                          }
+                          
+                          // Upload TIFF to backend for conversion
+                          const formData = new FormData();
+                          formData.append('tiff', file);
+                          // Send bounds to backend so we can include them in response
+                          if (extractedBounds) {
+                            formData.append('bounds', JSON.stringify(extractedBounds));
+                          }
+                          
+                          const response = await axios.post(`${BACKEND_URL}/api/convert-tiff`, formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                          });
+                          
+                          if (response.data.success) {
+                            // Restore bounds from backend response if available
+                            if (response.data.bounds) {
+                              setGeoBounds(response.data.bounds);
+                            } else if (extractedBounds) {
+                              setGeoBounds(extractedBounds);
+                            }
+                            
+                            setDigitizerOrthophoto({
+                              uri: response.data.base64,
+                              name: response.data.filename,
+                              size: file.size,
+                              originalName: file.name
+                            });
+                            setDrawnRows([]);
+                            setCurrentRow([]);
+                            setIsDrawingRow(false);
+                            
+                            const currentBounds = response.data.bounds || extractedBounds || geoBounds;
+                            const boundsMsg = currentBounds
+                              ? `\n✅ Coordinates: ${currentBounds.minLng.toFixed(6)}, ${currentBounds.minLat.toFixed(6)} to ${currentBounds.maxLng.toFixed(6)}, ${currentBounds.maxLat.toFixed(6)}`
+                              : '\n⚠️ No georeferencing found - coordinates may be inaccurate';
+                            showAlert('Success', `TIFF converted!${boundsMsg}\n\nClick "Draw New Row" to begin.`);
+                          } else {
+                            showAlert('Error', 'Failed to convert TIFF file');
+                          }
+                        } catch (error) {
+                          console.error('TIFF conversion error:', error);
+                          showAlert('Error', 
+                            'Failed to convert TIFF file. Error: ' + error.message + '\n\n' +
+                            'Please convert your TIFF to PNG/JPG using QGIS first:\n' +
+                            'Right-click layer → Export → Save As → PNG/JPEG');
+                        } finally {
+                          setLoading(false);
+                        }
+                        return;
+                      }
+                      
+                      // Regular image file (PNG/JPG) - no geospatial info
+                      setGeoBounds(null);
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setDigitizerOrthophoto({
+                          uri: event.target.result,
+                          name: file.name,
+                          size: file.size
+                        });
+                        setDrawnRows([]);
+                        setCurrentRow([]);
+                        setIsDrawingRow(false);
+                        showAlert('Image Loaded', 
+                          'PNG/JPG loaded successfully!\n\n' +
+                          '⚠️ Note: PNG/JPG files don\'t contain geospatial coordinates.\n' +
+                          'Exported coordinates will be approximate. Use GeoTIFF for accurate results.');
+                      };
+                      reader.readAsDataURL(file);
+                    };
+                    input.click();
+                  } catch (error) {
+                    showAlert('Error', 'Failed to load orthophoto: ' + error.message);
+                  }
+                }}
                 disabled={loading}
               >
                 <Text style={styles.uploadEmoji}>🗺️</Text>
                 <Text style={styles.uploadText}>
-                  {digitizerOrthophoto ? '✓ Orthophoto Loaded' : 'Load Orthophoto'}
+                  {digitizerOrthophoto ? `✓ ${digitizerOrthophoto.name}` : 'Load Orthophoto'}
                 </Text>
               </TouchableOpacity>
 
-              {/* Step 2: Drawing Canvas */}
+              {/* Step 2: Interactive Drawing Canvas */}
               {digitizerOrthophoto && (
                 <>
+                  {geoBounds && (
+                    <View style={styles.geoBoundsCardStyle}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={{ fontSize: 20, marginRight: 8 }}>🌍</Text>
+                        <Text style={{ fontWeight: 'bold', fontSize: 15, color: '#10b981' }}>Georeferenced</Text>
+                        <View style={styles.successBadgeStyle}>
+                          <Text style={{ fontSize: 9, color: '#fff', fontWeight: 'bold' }}>ACTIVE</Text>
+                        </View>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, marginTop: 8 }}>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                          <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 6, flex: 1, minWidth: 140 }}>
+                            <Text style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Min Lng</Text>
+                            <Text style={{ fontSize: 12, color: '#e2e8f0', fontFamily: 'monospace' }}>{geoBounds.minLng.toFixed(6)}</Text>
+                          </View>
+                          <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 6, flex: 1, minWidth: 140 }}>
+                            <Text style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Min Lat</Text>
+                            <Text style={{ fontSize: 12, color: '#e2e8f0', fontFamily: 'monospace' }}>{geoBounds.minLat.toFixed(6)}</Text>
+                          </View>
+                          <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 6, flex: 1, minWidth: 140 }}>
+                            <Text style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Max Lng</Text>
+                            <Text style={{ fontSize: 12, color: '#e2e8f0', fontFamily: 'monospace' }}>{geoBounds.maxLng.toFixed(6)}</Text>
+                          </View>
+                          <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 6, flex: 1, minWidth: 140 }}>
+                            <Text style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Max Lat</Text>
+                            <Text style={{ fontSize: 12, color: '#e2e8f0', fontFamily: 'monospace' }}>{geoBounds.maxLat.toFixed(6)}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  
+                  {!geoBounds && (
+                    <View style={styles.warningCardStyle}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 20, marginRight: 8 }}>⚠️</Text>
+                        <View>
+                          <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#fbbf24' }}>No Georeferencing</Text>
+                          <Text style={{ fontSize: 12, color: '#fcd34d', marginTop: 4 }}>Pixel coordinates only - may not match QGIS</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Step 2: Digitize Rows</Text>
-                  </View>
-
-                  <View style={styles.drawingCanvas}>
-                    <Image
-                      source={{ uri: digitizerOrthophoto.uri }}
-                      style={styles.orthophotoPreview}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.drawingHint}>
-                      {isDrawingRow ? 'Click to add points, tap "Finish Row" when complete' : 'Tap "Draw Row" to start digitizing'}
+                    <Text style={styles.sectionTitle}>Step 2: Draw Vineyard Rows</Text>
+                    <Text style={styles.sectionDesc}>
+                      Click to add points, double-click to finish each row
                     </Text>
                   </View>
 
-                  <View style={styles.drawingControls}>
+                  {/* Drawing Canvas with Orthophoto */}
+                  <View style={styles.canvasContainerModern}>
+                    {/* Zoom Controls Overlay */}
+                    <View style={styles.zoomControlsModern}>
+                      <TouchableOpacity
+                        style={styles.zoomBtnModern}
+                        onPress={() => {
+                          const newZoom = Math.min(zoomLevel * 1.2, 10);
+                          setZoomLevel(newZoom);
+                        }}
+                      >
+                        <Text style={{ fontSize: 20, color: '#fff', fontWeight: '300' }}>+</Text>
+                      </TouchableOpacity>
+                      <View style={{ paddingVertical: 8 }}>
+                        <Text style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center' }}>ZOOM</Text>
+                        <Text style={{ fontSize: 16, color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>{Math.round(zoomLevel * 100)}%</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.zoomBtnModern}
+                        onPress={() => {
+                          const newZoom = Math.max(zoomLevel * 0.8, 0.1);
+                          setZoomLevel(newZoom);
+                        }}
+                      >
+                        <Text style={{ fontSize: 20, color: '#fff', fontWeight: '300' }}>−</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.zoomBtnModern, { backgroundColor: '#475569', marginTop: 8 }]}
+                        onPress={() => {
+                          setZoomLevel(1);
+                          setPanOffset({ x: 0, y: 0 });
+                        }}
+                      >
+                        <Text style={{ fontSize: 16, color: '#fff' }}>⟲</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Mode Indicator */}
+                    <View style={styles.modeIndicatorStyle}>
+                      {isDrawingRow ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={styles.pulsingDotStyle} />
+                          <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>Drawing Mode</Text>
+                        </View>
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 14 }}>🖱️</Text>
+                          <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500' }}>Pan Mode</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <canvas
+                      ref={canvasRef}
+                      id="digitizer-canvas"
+                      style={{
+                        width: '100%',
+                        maxWidth: '100%',
+                        height: 'auto',
+                        border: '2px solid #334155',
+                        borderRadius: '12px',
+                        cursor: isPanning ? 'grabbing' : (isDrawingRow ? 'crosshair' : 'grab'),
+                        backgroundColor: '#0f172a',
+                        display: 'block',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+                      }}
+                    />
+                  </View>
+
+                  {/* Drawing Controls */}
+                  <View style={styles.digitizerControls}>
                     <TouchableOpacity
-                      style={[styles.drawBtn, isDrawingRow && styles.drawBtnActive]}
+                      style={[styles.digitizerBtn, isDrawingRow && styles.digitizerBtnActive]}
                       onPress={() => {
                         if (isDrawingRow) {
-                          // Finish current row
-                          if (currentRow.length >= 2) {
-                            setDrawnRows([...drawnRows, currentRow]);
-                            setCurrentRow([]);
-                            setIsDrawingRow(false);
-                            showAlert('Row Completed', `Row ${drawnRows.length + 1} saved`);
-                          } else {
-                            showAlert('Error', 'Need at least 2 points to create a row');
-                          }
+                          // Cancel current row
+                          setCurrentRow([]);
+                          setIsDrawingRow(false);
                         } else {
                           // Start new row
                           setIsDrawingRow(true);
@@ -2008,64 +2925,183 @@ export default function App() {
                         }
                       }}
                     >
-                      <Text style={styles.drawBtnText}>
-                        {isDrawingRow ? '✓ Finish Row' : '✏️ Draw Row'}
+                      <Text style={styles.digitizerBtnText}>
+                        {isDrawingRow ? '✕ Cancel' : '✏️ Draw New Row'}
                       </Text>
                     </TouchableOpacity>
 
+                    {isDrawingRow && currentRow.length >= 2 && (
+                      <TouchableOpacity
+                        style={[styles.digitizerBtn, { backgroundColor: '#2e7d32' }]}
+                        onPress={() => {
+                          setDrawnRows([...drawnRows, { 
+                            id: `row_${drawnRows.length + 1}`,
+                            points: currentRow,
+                            number: drawnRows.length + 1
+                          }]);
+                          setCurrentRow([]);
+                          setIsDrawingRow(false);
+                          showAlert('Row Completed', `Row ${drawnRows.length + 1} saved`);
+                        }}
+                      >
+                        <Text style={styles.digitizerBtnText}>
+                          ✓ Finish Row
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {drawnRows.length > 0 && (
+                      <TouchableOpacity
+                        style={[styles.digitizerBtn, { backgroundColor: '#d32f2f' }]}
+                        onPress={() => {
+                          if (drawnRows.length === 0) return;
+                          setDrawnRows(drawnRows.slice(0, -1));
+                          showAlert('Row Deleted', `Removed row ${drawnRows.length}`);
+                        }}
+                      >
+                        <Text style={styles.digitizerBtnText}>
+                          ⬅️ Undo Last Row
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
                     <TouchableOpacity
-                      style={styles.clearBtn}
+                      style={[styles.digitizerBtn, { backgroundColor: '#666' }]}
                       onPress={() => {
                         setDrawnRows([]);
                         setCurrentRow([]);
                         setIsDrawingRow(false);
-                        showAlert('Cleared', 'All rows have been cleared');
+                        showAlert('Cleared', 'All rows deleted');
                       }}
                       disabled={drawnRows.length === 0 && currentRow.length === 0}
                     >
-                      <Text style={styles.clearBtnText}>
+                      <Text style={styles.digitizerBtnText}>
                         🗑️ Clear All
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  <Text style={styles.rowCount}>
-                    Rows digitized: {drawnRows.length} {currentRow.length > 0 && `(+ 1 in progress)`}
-                  </Text>
+                  {/* Status Display */}
+                  <View style={styles.digitizerStatus}>
+                    <Text style={styles.digitizerStatusText}>
+                      📊 Rows digitized: <Text style={{ fontWeight: 'bold', color: '#2e7d32' }}>{drawnRows.length}</Text>
+                    </Text>
+                    {isDrawingRow && (
+                      <Text style={styles.digitizerStatusText}>
+                        ✏️ Current row: {currentRow.length} points
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Row List */}
+                  {drawnRows.length > 0 && (
+                    <View style={styles.rowListContainer}>
+                      <Text style={styles.rowListTitle}>Digitized Rows:</Text>
+                      <ScrollView style={styles.rowList}>
+                        {drawnRows.map((row, idx) => (
+                          <View key={row.id} style={styles.rowListItem}>
+                            <Text style={styles.rowListNumber}>Row {row.number}</Text>
+                            <Text style={styles.rowListPoints}>{row.points.length} points</Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                const newRows = drawnRows.filter((_, i) => i !== idx);
+                                // Renumber remaining rows
+                                const renumbered = newRows.map((r, i) => ({
+                                  ...r,
+                                  number: i + 1,
+                                  id: `row_${i + 1}`
+                                }));
+                                setDrawnRows(renumbered);
+                                showAlert('Deleted', `Row ${row.number} removed`);
+                              }}
+                            >
+                              <Text style={styles.rowListDelete}>✕</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
 
                   {/* Step 3: Export GeoJSON */}
                   {drawnRows.length > 0 && (
-                    <TouchableOpacity
-                      style={styles.analyzeBtn}
-                      onPress={() => {
-                        const geojson = {
-                          type: 'FeatureCollection',
-                          features: drawnRows.map((row, idx) => ({
-                            type: 'Feature',
-                            properties: { row_id: idx + 1 },
-                            geometry: {
-                              type: 'LineString',
-                              coordinates: row
-                            }
-                          }))
-                        };
-                        
-                        // Export GeoJSON
-                        const dataStr = JSON.stringify(geojson, null, 2);
-                        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                        const url = URL.createObjectURL(dataBlob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `digitized_rows_${Date.now()}.geojson`;
-                        link.click();
-                        
-                        showAlert('Success', `Exported ${drawnRows.length} rows as GeoJSON`);
-                      }}
-                    >
-                      <Text style={styles.analyzeBtnText}>
-                        💾 Export GeoJSON
-                      </Text>
-                    </TouchableOpacity>
+                    <>
+                      <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Step 3: Export GeoJSON</Text>
+                        <Text style={styles.sectionDesc}>
+                          Download the digitized rows as GeoJSON with coordinates
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.analyzeBtn}
+                        onPress={() => {
+                          const canvas = document.getElementById('digitizer-canvas');
+                          
+                          // Use extracted GeoTIFF bounds or fallback to defaults
+                          const bounds = geoBounds || {
+                            minLng: 23.859,
+                            maxLng: 23.861,
+                            minLat: 46.183,
+                            maxLat: 46.185
+                          };
+                          
+                          if (!geoBounds) {
+                            showAlert('Warning', 
+                              'No geospatial coordinates found in image.\n\n' +
+                              'Using approximate coordinates. For accurate results, use a GeoTIFF file.\n\n' +
+                              'Proceeding with export...');
+                          }
+                          
+                          const features = drawnRows.map((row) => {
+                            const coords = row.points.map(point => {
+                              // Convert pixel to lat/lng using actual bounds
+                              const lng = bounds.minLng + (point.x / canvas.width) * (bounds.maxLng - bounds.minLng);
+                              const lat = bounds.maxLat - (point.y / canvas.height) * (bounds.maxLat - bounds.minLat);
+                              return [lng, lat];
+                            });
+                            
+                            return {
+                              type: 'Feature',
+                              properties: { rand: row.number.toString() },
+                              geometry: {
+                                type: 'MultiLineString',
+                                coordinates: [coords]
+                              }
+                            };
+                          });
+                          
+                          const geojson = {
+                            type: 'FeatureCollection',
+                            name: `digitized_rows_${Date.now()}`,
+                            crs: {
+                              type: 'name',
+                              properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' }
+                            },
+                            features
+                          };
+                          
+                          // Export GeoJSON
+                          const dataStr = JSON.stringify(geojson, null, 2);
+                          const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                          const url = URL.createObjectURL(dataBlob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `digitized_rows_${Date.now()}.geojson`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                          
+                          const coordMsg = geoBounds 
+                            ? `\nCoordinates: ${bounds.minLng.toFixed(6)} to ${bounds.maxLng.toFixed(6)}, ${bounds.minLat.toFixed(6)} to ${bounds.maxLat.toFixed(6)}`
+                            : '\n⚠️ Using approximate coordinates';
+                          showAlert('Success', `Exported ${drawnRows.length} rows to GeoJSON${coordMsg}`);
+                        }}
+                      >
+                        <Text style={styles.analyzeBtnText}>
+                          📥 Export GeoJSON
+                        </Text>
+                      </TouchableOpacity>
+                    </>
                   )}
                 </>
               )}
@@ -2118,7 +3154,7 @@ export default function App() {
           ) : analysisType === 'orthophoto-gaps' ? (
             <>
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Select Orthophoto</Text>
+                <Text style={styles.sectionTitle}>Step 1: Select Orthophoto</Text>
                 <Text style={styles.sectionDesc}>
                   Upload your orthophoto image (.tif format)
                 </Text>
@@ -2135,10 +3171,46 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
 
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Step 2: Upload Rows GeoJSON (Required) ⚠️</Text>
+                <Text style={styles.sectionDesc}>
+                  Upload rows.geojson file to define vineyard row locations
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.uploadBtn, styles.uploadBtnSecondary, !rowsGeojson && styles.uploadBtnRequired]}
+                onPress={pickRowsGeojson}
+                disabled={loading}
+              >
+                <Text style={styles.uploadEmoji}>📍</Text>
+                <Text style={styles.uploadText}>
+                  {rowsGeojson ? `✓ ${rowsGeojson.name || 'GeoJSON Selected'}` : '⚠️ Select Rows GeoJSON (REQUIRED)'}
+                </Text>
+              </TouchableOpacity>
+
+              {rowsGeojson && (
+                <View style={styles.geojsonInfo}>
+                  <Text style={styles.geojsonName}>✓ {rowsGeojson.name || 'rows.geojson'}</Text>
+                  <TouchableOpacity onPress={() => setRowsGeojson(null)}>
+                    <Text style={styles.removeIcon}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!rowsGeojson && (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningEmoji}>⚠️</Text>
+                  <Text style={styles.warningText}>
+                    Rows GeoJSON file is REQUIRED for gap detection analysis
+                  </Text>
+                </View>
+              )}
+
               {selectedImages.length > 0 && (
                 <>
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Clustering Method</Text>
+                    <Text style={styles.sectionTitle}>Step 3: Clustering Method</Text>
                     <Text style={styles.sectionDesc}>
                       Select the algorithm for detecting bare soil and gaps
                     </Text>
@@ -2185,32 +3257,6 @@ export default function App() {
                       <Text style={styles.methodDesc}>Slow but Accurate</Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Rows GeoJSON (Optional)</Text>
-                    <Text style={styles.sectionDesc}>
-                      Upload rows.geojson file, or leave empty to use default path
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={[styles.uploadBtn, styles.uploadBtnSecondary]}
-                    onPress={pickRowsGeojson}
-                    disabled={loading}
-                  >
-                    <Text style={styles.uploadEmoji}>📍</Text>
-                    <Text style={styles.uploadText}>
-                      {rowsGeojson ? `✓ ${rowsGeojson.name || 'GeoJSON Selected'}` : 'Select Rows GeoJSON (Optional)'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {rowsGeojson && (
-                    <View style={styles.geojsonInfo}>
-                      <Text style={styles.geojsonName}>📄 {rowsGeojson.name || 'rows.geojson'}</Text>
-                      <TouchableOpacity onPress={() => setRowsGeojson(null)}>
-                        <Text style={styles.removeIcon}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
                 </>
               )}
 
@@ -2366,7 +3412,7 @@ export default function App() {
                   (analysisType === 'image-annotation' && (selectedLogFiles.length === 0 || annotationImages.length === 0)) ||
                   (analysisType === 'training-dataset') ||
                   (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && analysisType !== 'orthophoto-gaps' && selectedImages.length === 0) ||
-                  (analysisType === 'orthophoto-gaps' && selectedImages.length === 0)
+                  (analysisType === 'orthophoto-gaps' && (selectedImages.length === 0 || !rowsGeojson))
                 ) && styles.analyzeBtnDisabled
               ]}
               onPress={handleAnalyze}
@@ -2376,7 +3422,7 @@ export default function App() {
                 (analysisType === 'image-annotation' && (selectedLogFiles.length === 0 || annotationImages.length === 0)) ||
                 (analysisType === 'training-dataset') ||
                 (analysisType !== 'dji-log' && analysisType !== 'image-annotation' && analysisType !== 'training-dataset' && analysisType !== 'orthophoto-gaps' && selectedImages.length === 0) ||
-                (analysisType === 'orthophoto-gaps' && selectedImages.length === 0)
+                (analysisType === 'orthophoto-gaps' && (selectedImages.length === 0 || !rowsGeojson))
               }
             >
               {loading ? (
@@ -3402,6 +4448,9 @@ const styles = StyleSheet.create({
   cardDatasetJSON: {
     borderLeftColor: '#8B5CF6',
   },
+  cardManualAnnotation: {
+    borderLeftColor: '#10b981',
+  },
   cardDisabled: {
     opacity: 0.5,
   },
@@ -3526,6 +4575,32 @@ const styles = StyleSheet.create({
   uploadBtnSecondary: {
     borderColor: '#f39c12',
     paddingVertical: 30,
+  },
+  uploadBtnRequired: {
+    borderColor: '#e74c3c',
+    borderWidth: 3,
+    backgroundColor: '#fff5f5',
+  },
+  warningBox: {
+    marginHorizontal: 16,
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107',
+  },
+  warningEmoji: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#856404',
+    fontWeight: '500',
   },
   uploadEmoji: {
     fontSize: 36,
@@ -4901,4 +5976,458 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
   },
+  // Manual Digitizer Styles - ENHANCED
+  digitizerHeaderCard: {
+    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#334155',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  digitizerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  digitizerSubtitle: {
+    fontSize: 14,
+    color: '#94a3b8',
+  },
+  statBadgeStyle: {
+    backgroundColor: '#1e293b',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    minWidth: 70,
+  },
+  statLabelStyle: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  statValueStyle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#3b82f6',
+    marginTop: 4,
+  },
+  geoBoundsCardStyle: {
+    background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  successBadgeStyle: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  warningCardStyle: {
+    backgroundColor: '#92400e',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  canvasContainerModern: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  zoomControlsModern: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    gap: 6,
+  },
+  zoomBtnModern: {
+    backgroundColor: '#2563eb',
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  modeIndicatorStyle: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  pulsingDotStyle: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 4,
+  },
+  digitizerContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 8,
+    marginVertical: 12,
+    position: 'relative',
+  },
+  zoomControls: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 8,
+    padding: 8,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  zoomBtn: {
+    backgroundColor: '#1a472a',
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+  },
+  zoomBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  zoomLevel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a472a',
+    minWidth: 45,
+    textAlign: 'center',
+  },
+  zoomHint: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  digitizerControls: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    justifyContent: 'center',
+  },
+  digitizerBtn: {
+    backgroundColor: '#1a472a',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  digitizerBtnActive: {
+    backgroundColor: '#FFD700',
+  },
+  digitizerBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  digitizerStatus: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2e7d32',
+  },
+  digitizerStatusText: {
+    fontSize: 14,
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  rowListContainer: {
+    marginTop: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  rowListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  rowList: {
+    maxHeight: 200,
+  },
+  rowListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  rowListNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2e7d32',
+    flex: 1,
+  },
+  rowListPoints: {
+    fontSize: 12,
+    color: '#6B7280',
+    flex: 1,
+    textAlign: 'center',
+  },
+  rowListDelete: {
+    fontSize: 18,
+    color: '#d32f2f',
+    fontWeight: 'bold',
+    paddingHorizontal: 12,
+  },
+  // Manual Annotation Tool Styles
+  imageNavigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  navBtn: {
+    backgroundColor: '#1a472a',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  navBtnDisabled: {
+    backgroundColor: '#ccc',
+    opacity: 0.5,
+  },
+  navBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  imageCounter: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a472a',
+  },
+  annotationWorkspace: {
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 20,
+  },
+  canvasSection: {
+    flex: 2,
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+  },
+  imageName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  canvasHint: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  labelPanel: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  panelTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a472a',
+    marginBottom: 12,
+  },
+  labelGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  labelChip: {
+    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  labelChipActive: {
+    backgroundColor: '#1a472a',
+    borderColor: '#10b981',
+  },
+  labelChipText: {
+    fontSize: 13,
+    color: '#333',
+    fontWeight: '500',
+  },
+  labelChipTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  addLabelBtn: {
+    backgroundColor: '#f0f9ff',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#3b82f6',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addLabelText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  labelInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  labelInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  saveLabelBtn: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  saveLabelText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  annotationsList: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  annotationItem: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  annotationItemSelected: {
+    borderColor: '#fbbf24',
+    backgroundColor: '#fffbeb',
+  },
+  annotationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a472a',
+    marginBottom: 4,
+  },
+  annotationCoords: {
+    fontSize: 11,
+    color: '#666',
+    fontFamily: 'monospace',
+  },
+  deleteBoxBtn: {
+    backgroundColor: '#ef4444',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteBoxText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  exportAnnotationsBtn: {
+    backgroundColor: '#8b5cf6',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  exportAnnotationsText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
+
