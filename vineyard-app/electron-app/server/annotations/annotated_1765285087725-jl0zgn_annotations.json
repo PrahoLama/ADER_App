@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765285087725-jl0zgn.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285087725-jl0zgn.JPG",
+  "timestamp": "2025-12-09T13:13:19.128Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "bird",
+      "class_id": 14,
+      "confidence": 0.617,
+      "bbox": {
+        "x1": 491.0115966796875,
+        "y1": 244.64254760742188,
+        "x2": 537.01806640625,
+        "y2": 334.4313049316406,
+        "width": 46.0064697265625,
+        "height": 89.78875732421875
+      },
+      "bbox_normalized": {
+        "x_center": 0.8031481504440308,
+        "y_center": 0.5655018091201782,
+        "width": 0.0718851089477539,
+        "height": 0.17536866664886475
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765286221653-matanw.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286221653-matanw.JPG",
+  "timestamp": "2025-12-09T13:31:02.104Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "book",
+      "class_id": 73,
+      "confidence": 0.39,
+      "bbox": {
+        "x1": 4.85577392578125,
+        "y1": 2.80804443359375,
+        "x2": 234.93557739257812,
+        "y2": 366.9564208984375,
+        "width": 230.07980346679688,
+        "height": 364.14837646484375
+      },
+      "bbox_normalized": {
+        "x_center": 0.1873369961977005,
+        "y_center": 0.36109811067581177,
+        "width": 0.3594996929168701,
+        "height": 0.711227297782898
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

@@ -1,0 +1,104 @@
+{
+  "image": "annotated_1767546202642-6p1b2c.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1767546202642-6p1b2c.JPG",
+  "timestamp": "2026-01-04T17:03:33.106Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "image_size": {
+    "width": 3000,
+    "height": 2250
+  },
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.545,
+      "bbox": {
+        "x1": 2684.03076171875,
+        "y1": 736.666259765625,
+        "x2": 2765.777099609375,
+        "y2": 898.8716430664062,
+        "width": 81.746337890625,
+        "height": 162.20538330078125
+      },
+      "bbox_normalized": {
+        "x_center": 0.9083012938499451,
+        "y_center": 0.36345285177230835,
+        "width": 0.02724877931177616,
+        "height": 0.07209128141403198
+      },
+      "id": 0,
+      "isModified": false
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.516,
+      "bbox": {
+        "x1": 2580.269775390625,
+        "y1": 837.8433837890625,
+        "x2": 2646.71142578125,
+        "y2": 937.8859252929688,
+        "width": 66.441650390625,
+        "height": 100.04254150390625
+      },
+      "bbox_normalized": {
+        "x_center": 0.871163547039032,
+        "y_center": 0.39460650086402893,
+        "width": 0.02214721590280533,
+        "height": 0.044463351368904114
+      },
+      "id": 1,
+      "isModified": false
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.431,
+      "bbox": {
+        "x1": 2115.091552734375,
+        "y1": 930.0469970703125,
+        "x2": 2161.290771484375,
+        "y2": 1036.6158447265625,
+        "width": 46.19921875,
+        "height": 106.56884765625
+      },
+      "bbox_normalized": {
+        "x_center": 0.7127304077148438,
+        "y_center": 0.4370361864566803,
+        "width": 0.015399739146232605,
+        "height": 0.04736393317580223
+      },
+      "id": 2,
+      "isModified": false
+    },
+    {
+      "id": 3,
+      "class": "lama",
+      "class_id": 8,
+      "confidence": 1,
+      "bbox": {
+        "x1": 2387.376220703125,
+        "y1": 863.1553344726562,
+        "x2": 2509.9423828125,
+        "y2": 989.274169921875,
+        "width": 122.566162109375,
+        "height": 126.11883544921875
+      },
+      "bbox_normalized": {},
+      "isModified": true,
+      "isManual": true
+    }
+  ],
+  "detection_count": 4,
+  "manual_corrections": [
+    {
+      "timestamp": "2026-01-04T17:03:51.685Z",
+      "action": "edited",
+      "previous_count": 4,
+      "new_count": 4
+    }
+  ],
+  "status": "corrected",
+  "last_modified": "2026-01-04T17:03:51.685Z"
+}

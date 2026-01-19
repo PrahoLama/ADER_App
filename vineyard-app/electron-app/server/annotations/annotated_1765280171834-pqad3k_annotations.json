@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765280171834-pqad3k.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171834-pqad3k.JPG",
+  "timestamp": "2025-12-09T11:46:52.386Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "cell phone",
+      "class_id": 67,
+      "confidence": 0.507,
+      "bbox": {
+        "x1": 261.64453125,
+        "y1": 199.3697509765625,
+        "x2": 445.759521484375,
+        "y2": 297.55615234375,
+        "width": 184.114990234375,
+        "height": 98.1864013671875
+      },
+      "bbox_normalized": {
+        "x_center": 0.5526593923568726,
+        "y_center": 0.4852792024612427,
+        "width": 0.28767967224121094,
+        "height": 0.19177031517028809
+      }
+    },
+    {
+      "class": "sports ball",
+      "class_id": 32,
+      "confidence": 0.426,
+      "bbox": {
+        "x1": 282.0364990234375,
+        "y1": 260.2626953125,
+        "x2": 314.4486083984375,
+        "y2": 289.03460693359375,
+        "width": 32.412109375,
+        "height": 28.77191162109375
+      },
+      "bbox_normalized": {
+        "x_center": 0.46600398421287537,
+        "y_center": 0.5364231467247009,
+        "width": 0.0506439208984375,
+        "height": 0.05619513988494873
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765286220604-yuequ7.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286220604-yuequ7.JPG",
+  "timestamp": "2025-12-09T13:23:46.570Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "book",
+      "class_id": 73,
+      "confidence": 0.405,
+      "bbox": {
+        "x1": 4.864593505859375,
+        "y1": 1.88128662109375,
+        "x2": 235.49533081054688,
+        "y2": 365.6630859375,
+        "width": 230.6307373046875,
+        "height": 363.78179931640625
+      },
+      "bbox_normalized": {
+        "x_center": 0.1877811849117279,
+        "y_center": 0.3589300513267517,
+        "width": 0.3603605329990387,
+        "height": 0.710511326789856
+      }
+    },
+    {
+      "class": "fire hydrant",
+      "class_id": 10,
+      "confidence": 0.351,
+      "bbox": {
+        "x1": 525.843505859375,
+        "y1": 91.84278869628906,
+        "x2": 537.69970703125,
+        "y2": 123.73057556152344,
+        "width": 11.856201171875,
+        "height": 31.887786865234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.8308931589126587,
+        "y_center": 0.21052086353302002,
+        "width": 0.018525313585996628,
+        "height": 0.06228083372116089
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

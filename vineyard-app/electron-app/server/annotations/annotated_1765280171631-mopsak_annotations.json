@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280171631-mopsak.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171631-mopsak.JPG",
+  "timestamp": "2025-12-09T11:45:22.653Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.686,
+      "bbox": {
+        "x1": 282.75250244140625,
+        "y1": 309.47564697265625,
+        "x2": 306.17779541015625,
+        "y2": 363.61370849609375,
+        "width": 23.42529296875,
+        "height": 54.1380615234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.46010178327560425,
+        "y_center": 0.6573138236999512,
+        "width": 0.036602020263671875,
+        "height": 0.10573840141296387
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

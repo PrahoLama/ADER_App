@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765285086470-jhack7.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285086470-jhack7.JPG",
+  "timestamp": "2025-12-09T13:05:27.581Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.554,
+      "bbox": {
+        "x1": 1584.4384765625,
+        "y1": 1724.7769775390625,
+        "x2": 1935.1959228515625,
+        "y2": 2249.03759765625,
+        "width": 350.7574462890625,
+        "height": 524.2606201171875
+      },
+      "bbox_normalized": {
+        "x_center": 0.5866057276725769,
+        "y_center": 0.8830698728561401,
+        "width": 0.1169191524386406,
+        "height": 0.23300471901893616
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

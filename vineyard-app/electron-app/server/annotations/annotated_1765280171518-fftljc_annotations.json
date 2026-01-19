@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280171518-fftljc.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171518-fftljc.JPG",
+  "timestamp": "2025-12-09T11:44:31.888Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "parking meter",
+      "class_id": 12,
+      "confidence": 0.476,
+      "bbox": {
+        "x1": 3.517425537109375,
+        "y1": 2,
+        "x2": 235.18307495117188,
+        "y2": 361.9754638671875,
+        "width": 231.6656494140625,
+        "height": 359.9754638671875
+      },
+      "bbox_normalized": {
+        "x_center": 0.18648476898670197,
+        "y_center": 0.3554447889328003,
+        "width": 0.36197757720947266,
+        "height": 0.7030770778656006
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

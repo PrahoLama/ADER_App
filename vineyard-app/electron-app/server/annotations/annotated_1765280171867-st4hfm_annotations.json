@@ -1,0 +1,69 @@
+{
+  "image": "annotated_1765280171867-st4hfm.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171867-st4hfm.JPG",
+  "timestamp": "2025-12-09T11:47:08.863Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.639,
+      "bbox": {
+        "x1": 1000.37939453125,
+        "y1": 664.0159301757812,
+        "x2": 1046.871826171875,
+        "y2": 778.153564453125,
+        "width": 46.492431640625,
+        "height": 114.13763427734375
+      },
+      "bbox_normalized": {
+        "x_center": 0.3412085473537445,
+        "y_center": 0.3204821050167084,
+        "width": 0.015497476793825626,
+        "height": 0.05072783678770065
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.504,
+      "bbox": {
+        "x1": 869.876708984375,
+        "y1": 806.2525634765625,
+        "x2": 923.22216796875,
+        "y2": 923.9722290039062,
+        "width": 53.345458984375,
+        "height": 117.71966552734375
+      },
+      "bbox_normalized": {
+        "x_center": 0.29884982109069824,
+        "y_center": 0.384494423866272,
+        "width": 0.0177818201482296,
+        "height": 0.05231985077261925
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.441,
+      "bbox": {
+        "x1": 1273.24755859375,
+        "y1": 507.573486328125,
+        "x2": 1309.42724609375,
+        "y2": 584.9591674804688,
+        "width": 36.1796875,
+        "height": 77.38568115234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.4304457902908325,
+        "y_center": 0.24278505146503448,
+        "width": 0.012059896253049374,
+        "height": 0.034393634647130966
+      }
+    }
+  ],
+  "detection_count": 3,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

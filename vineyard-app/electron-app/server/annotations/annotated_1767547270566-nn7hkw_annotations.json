@@ -1,0 +1,152 @@
+{
+  "image": "annotated_1767547270566-nn7hkw.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1767547270566-nn7hkw.JPG",
+  "timestamp": "2026-01-04T17:21:20.611Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "image_size": {
+    "width": 3000,
+    "height": 2250
+  },
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.592,
+      "bbox": {
+        "x1": 2211.612548828125,
+        "y1": 933.5782470703125,
+        "x2": 2259.05908203125,
+        "y2": 1071.4752197265625,
+        "width": 47.446533203125,
+        "height": 137.89697265625
+      },
+      "bbox_normalized": {
+        "x_center": 0.7451120018959045,
+        "y_center": 0.44556742906570435,
+        "width": 0.015815511345863342,
+        "height": 0.061287544667720795
+      },
+      "id": 0,
+      "isModified": false
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.535,
+      "bbox": {
+        "x1": 2241.86669921875,
+        "y1": 931.837890625,
+        "x2": 2321.487548828125,
+        "y2": 1094.069580078125,
+        "width": 79.620849609375,
+        "height": 162.231689453125
+      },
+      "bbox_normalized": {
+        "x_center": 0.76055908203125,
+        "y_center": 0.4502016603946686,
+        "width": 0.026540283113718033,
+        "height": 0.07210297137498856
+      },
+      "id": 1,
+      "isModified": false
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.487,
+      "bbox": {
+        "x1": 2546.49072265625,
+        "y1": 739.01611328125,
+        "x2": 2606.919921875,
+        "y2": 867.781005859375,
+        "width": 60.42919921875,
+        "height": 128.764892578125
+      },
+      "bbox_normalized": {
+        "x_center": 0.8589017987251282,
+        "y_center": 0.3570660352706909,
+        "width": 0.020143065601587296,
+        "height": 0.05722884088754654
+      },
+      "id": 2,
+      "isModified": false
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.475,
+      "bbox": {
+        "x1": 2323.912109375,
+        "y1": 942.65673828125,
+        "x2": 2389.716552734375,
+        "y2": 1080.995849609375,
+        "width": 65.804443359375,
+        "height": 138.339111328125
+      },
+      "bbox_normalized": {
+        "x_center": 0.7856048345565796,
+        "y_center": 0.44970056414604187,
+        "width": 0.021934814751148224,
+        "height": 0.06148405000567436
+      },
+      "id": 3,
+      "isModified": false
+    },
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.297,
+      "bbox": {
+        "x1": 2820.9296875,
+        "y1": 437.21600341796875,
+        "x2": 2942.9384765625,
+        "y2": 492.3122863769531,
+        "width": 122.0087890625,
+        "height": 55.096282958984375
+      },
+      "bbox_normalized": {
+        "x_center": 0.9606447219848633,
+        "y_center": 0.2065618485212326,
+        "width": 0.04066959768533707,
+        "height": 0.024487236514687538
+      },
+      "id": 4,
+      "isModified": false
+    },
+    {
+      "id": 5,
+      "class": "lama",
+      "class_id": 8,
+      "confidence": 1,
+      "bbox": {
+        "x1": 1422.8336181640625,
+        "y1": 602.5245361328125,
+        "x2": 2191.98095703125,
+        "y2": 1350.35595703125,
+        "width": 769.1473388671875,
+        "height": 747.8314208984375
+      },
+      "bbox_normalized": {},
+      "isModified": true,
+      "isManual": true
+    }
+  ],
+  "detection_count": 6,
+  "manual_corrections": [
+    {
+      "timestamp": "2026-01-04T17:21:40.110Z",
+      "action": "edited",
+      "previous_count": 8,
+      "new_count": 5
+    },
+    {
+      "timestamp": "2026-01-04T17:22:13.414Z",
+      "action": "edited",
+      "previous_count": 5,
+      "new_count": 6
+    }
+  ],
+  "status": "corrected",
+  "last_modified": "2026-01-04T17:22:13.414Z"
+}

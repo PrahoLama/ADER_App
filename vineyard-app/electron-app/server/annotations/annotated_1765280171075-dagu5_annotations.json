@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280171075-dagu5.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171075-dagu5.JPG",
+  "timestamp": "2025-12-09T11:41:14.346Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.441,
+      "bbox": {
+        "x1": 1179.1544189453125,
+        "y1": 455.6304016113281,
+        "x2": 1240.813232421875,
+        "y2": 524.8809204101562,
+        "width": 61.6588134765625,
+        "height": 69.25051879882812
+      },
+      "bbox_normalized": {
+        "x_center": 0.40332797169685364,
+        "y_center": 0.2178914099931717,
+        "width": 0.02055293694138527,
+        "height": 0.030778007581830025
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

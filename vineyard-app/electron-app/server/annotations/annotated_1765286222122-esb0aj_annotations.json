@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765286222122-esb0aj.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286222122-esb0aj.JPG",
+  "timestamp": "2025-12-09T13:34:39.224Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "boat",
+      "class_id": 8,
+      "confidence": 0.353,
+      "bbox": {
+        "x1": 2883.66845703125,
+        "y1": 1370.9541015625,
+        "x2": 2988.4150390625,
+        "y2": 1442.7469482421875,
+        "width": 104.74658203125,
+        "height": 71.7928466796875
+      },
+      "bbox_normalized": {
+        "x_center": 0.9786806106567383,
+        "y_center": 0.6252669095993042,
+        "width": 0.03491552919149399,
+        "height": 0.031907930970191956
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

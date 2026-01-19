@@ -1,0 +1,46 @@
+{
+  "image": "annotated_1767546938421-a7luwir.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1767546938421-a7luwir.JPG",
+  "timestamp": "2026-01-04T17:15:47.382Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "image_size": {
+    "width": 640,
+    "height": 512
+  },
+  "detections": [
+    {
+      "class": "missing",
+      "class_id": 4,
+      "confidence": 1,
+      "bbox": {
+        "x1": 322.1063232421875,
+        "y1": 148.29017639160156,
+        "x2": 395.2433776855469,
+        "y2": 271.06951904296875,
+        "width": 73.13705444335938,
+        "height": 122.77934265136719
+      },
+      "bbox_normalized": {},
+      "id": 0,
+      "isModified": false
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [
+    {
+      "timestamp": "2026-01-04T17:16:10.794Z",
+      "action": "edited",
+      "previous_count": 0,
+      "new_count": 1
+    },
+    {
+      "timestamp": "2026-01-04T17:16:23.646Z",
+      "action": "edited",
+      "previous_count": 1,
+      "new_count": 1
+    }
+  ],
+  "status": "corrected",
+  "last_modified": "2026-01-04T17:16:23.646Z"
+}

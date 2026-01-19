@@ -1,0 +1,69 @@
+{
+  "image": "annotated_1765286220520-clzcvp.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286220520-clzcvp.JPG",
+  "timestamp": "2025-12-09T13:23:19.251Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.674,
+      "bbox": {
+        "x1": 1639.5294189453125,
+        "y1": 745.1748657226562,
+        "x2": 1712.6708984375,
+        "y2": 796.5983276367188,
+        "width": 73.1414794921875,
+        "height": 51.4234619140625
+      },
+      "bbox_normalized": {
+        "x_center": 0.5587000250816345,
+        "y_center": 0.3426162600517273,
+        "width": 0.02438049390912056,
+        "height": 0.022854872047901154
+      }
+    },
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.612,
+      "bbox": {
+        "x1": 1727.2799072265625,
+        "y1": 779.5509033203125,
+        "x2": 1806.27734375,
+        "y2": 834.1083374023438,
+        "width": 78.9974365234375,
+        "height": 54.55743408203125
+      },
+      "bbox_normalized": {
+        "x_center": 0.5889261960983276,
+        "y_center": 0.3585909307003021,
+        "width": 0.02633247897028923,
+        "height": 0.024247748777270317
+      }
+    },
+    {
+      "class": "truck",
+      "class_id": 7,
+      "confidence": 0.402,
+      "bbox": {
+        "x1": 2298.8837890625,
+        "y1": 694.9672241210938,
+        "x2": 2617.224365234375,
+        "y2": 826.4639892578125,
+        "width": 318.340576171875,
+        "height": 131.49676513671875
+      },
+      "bbox_normalized": {
+        "x_center": 0.8193513751029968,
+        "y_center": 0.3380958139896393,
+        "width": 0.10611352324485779,
+        "height": 0.05844300612807274
+      }
+    }
+  ],
+  "detection_count": 3,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

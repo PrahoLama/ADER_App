@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765289174225-68yx8a.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765289174225-68yx8a.JPG",
+  "timestamp": "2025-12-09T14:07:59.561Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "dog",
+      "class_id": 16,
+      "confidence": 0.429,
+      "bbox": {
+        "x1": 1412.09814453125,
+        "y1": 1627.9754638671875,
+        "x2": 1887.88623046875,
+        "y2": 1924.0599365234375,
+        "width": 475.7880859375,
+        "height": 296.08447265625
+      },
+      "bbox_normalized": {
+        "x_center": 0.5499973893165588,
+        "y_center": 0.7893412113189697,
+        "width": 0.15859602391719818,
+        "height": 0.13159309327602386
+      }
+    },
+    {
+      "class": "truck",
+      "class_id": 7,
+      "confidence": 0.37,
+      "bbox": {
+        "x1": 0,
+        "y1": 1520.15185546875,
+        "x2": 551.7826538085938,
+        "y2": 2001.2125244140625,
+        "width": 551.7826538085938,
+        "height": 481.0606689453125
+      },
+      "bbox_normalized": {
+        "x_center": 0.09196377545595169,
+        "y_center": 0.7825254201889038,
+        "width": 0.18392755091190338,
+        "height": 0.21380473673343658
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

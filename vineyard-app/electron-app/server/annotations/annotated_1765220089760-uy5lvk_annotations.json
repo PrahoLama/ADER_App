@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765220089760-uy5lvk.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765220089760-uy5lvk.JPG",
+  "timestamp": "2025-12-08T18:57:35.624Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "truck",
+      "class_id": 7,
+      "confidence": 0.538,
+      "bbox": {
+        "x1": 2498.046142578125,
+        "y1": 1004.2450561523438,
+        "x2": 2791.91650390625,
+        "y2": 1191.6754150390625,
+        "width": 293.870361328125,
+        "height": 187.43035888671875
+      },
+      "bbox_normalized": {
+        "x_center": 0.8816604614257812,
+        "y_center": 0.48798230290412903,
+        "width": 0.09795678406953812,
+        "height": 0.08330237865447998
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

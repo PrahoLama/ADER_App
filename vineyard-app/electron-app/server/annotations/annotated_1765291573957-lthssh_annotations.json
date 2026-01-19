@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765291573957-lthssh.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765291573957-lthssh.JPG",
+  "timestamp": "2025-12-09T14:51:35.737Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.401,
+      "bbox": {
+        "x1": 241.18356323242188,
+        "y1": 217.3682098388672,
+        "x2": 287.3159484863281,
+        "y2": 336.66937255859375,
+        "width": 46.13238525390625,
+        "height": 119.30116271972656
+      },
+      "bbox_normalized": {
+        "x_center": 0.4128902554512024,
+        "y_center": 0.5410523414611816,
+        "width": 0.07208184897899628,
+        "height": 0.23301008343696594
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

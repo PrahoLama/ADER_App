@@ -1,0 +1,73 @@
+{
+  "image": "annotated_1767547270565-ys6a6s.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1767547270565-ys6a6s.JPG",
+  "timestamp": "2026-01-04T17:21:18.885Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "image_size": {
+    "width": 640,
+    "height": 512
+  },
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.279,
+      "bbox": {
+        "x1": 322.17645263671875,
+        "y1": 105.65042114257812,
+        "x2": 339.18109130859375,
+        "y2": 137.08013916015625,
+        "width": 17.004638671875,
+        "height": 31.429718017578125
+      },
+      "bbox_normalized": {
+        "x_center": 0.5166856050491333,
+        "y_center": 0.23704156279563904,
+        "width": 0.026569748297333717,
+        "height": 0.061386168003082275
+      },
+      "id": 0,
+      "isModified": false
+    },
+    {
+      "class": "person",
+      "class_id": 5,
+      "confidence": 1,
+      "bbox": {
+        "x1": 543.791259765625,
+        "y1": 179.34498596191406,
+        "x2": 629.8125610351562,
+        "y2": 250.96627807617188,
+        "width": 86.02130126953125,
+        "height": 71.62129211425781
+      },
+      "bbox_normalized": {},
+      "id": 1,
+      "isModified": false
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [
+    {
+      "timestamp": "2026-01-04T17:21:33.535Z",
+      "action": "edited",
+      "previous_count": 2,
+      "new_count": 2
+    },
+    {
+      "timestamp": "2026-01-04T17:21:40.972Z",
+      "action": "edited",
+      "previous_count": 2,
+      "new_count": 2
+    },
+    {
+      "timestamp": "2026-01-04T17:22:13.797Z",
+      "action": "edited",
+      "previous_count": 2,
+      "new_count": 2
+    }
+  ],
+  "status": "corrected",
+  "last_modified": "2026-01-04T17:22:13.797Z"
+}

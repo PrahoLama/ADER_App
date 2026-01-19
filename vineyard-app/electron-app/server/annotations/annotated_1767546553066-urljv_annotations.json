@@ -1,0 +1,62 @@
+{
+  "image": "annotated_1767546553066-urljv.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1767546553066-urljv.JPG",
+  "timestamp": "2026-01-04T17:09:21.120Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "image_size": {
+    "width": 3000,
+    "height": 2250
+  },
+  "detections": [
+    {
+      "class": "airplane",
+      "class_id": 4,
+      "confidence": 0.283,
+      "bbox": {
+        "x1": 2.190113067626953,
+        "y1": 1.8157482147216797,
+        "x2": 808.2269287109375,
+        "y2": 1177.3526611328125,
+        "width": 806.0368041992188,
+        "height": 1175.536865234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.13506950438022614,
+        "y_center": 0.2620374262332916,
+        "width": 0.2686789333820343,
+        "height": 0.5224608182907104
+      },
+      "id": 1,
+      "isModified": false
+    },
+    {
+      "id": 1,
+      "class": "grape",
+      "class_id": 1,
+      "confidence": 1,
+      "bbox": {
+        "x1": 1060.4639892578125,
+        "y1": 397.418701171875,
+        "x2": 2806.588134765625,
+        "y2": 1608.8701171875,
+        "width": 1746.1241455078125,
+        "height": 1211.451416015625
+      },
+      "bbox_normalized": {},
+      "isModified": true,
+      "isManual": true
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [
+    {
+      "timestamp": "2026-01-04T17:09:44.747Z",
+      "action": "edited",
+      "previous_count": 2,
+      "new_count": 2
+    }
+  ],
+  "status": "corrected",
+  "last_modified": "2026-01-04T17:09:44.747Z"
+}

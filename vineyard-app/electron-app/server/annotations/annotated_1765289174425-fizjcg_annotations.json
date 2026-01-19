@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765289174425-fizjcg.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765289174425-fizjcg.JPG",
+  "timestamp": "2025-12-09T14:09:09.003Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "bird",
+      "class_id": 14,
+      "confidence": 0.908,
+      "bbox": {
+        "x1": 2108.579345703125,
+        "y1": 1295.658447265625,
+        "x2": 2380.159423828125,
+        "y2": 1713.132568359375,
+        "width": 271.580078125,
+        "height": 417.47412109375
+      },
+      "bbox_normalized": {
+        "x_center": 0.7481231093406677,
+        "y_center": 0.668620228767395,
+        "width": 0.09052669256925583,
+        "height": 0.18554405868053436
+      }
+    },
+    {
+      "class": "skateboard",
+      "class_id": 36,
+      "confidence": 0.669,
+      "bbox": {
+        "x1": 0.4651308059692383,
+        "y1": 1897.91015625,
+        "x2": 301.7572937011719,
+        "y2": 2205.35791015625,
+        "width": 301.29217529296875,
+        "height": 307.44775390625
+      },
+      "bbox_normalized": {
+        "x_center": 0.05037040263414383,
+        "y_center": 0.9118373394012451,
+        "width": 0.10043072700500488,
+        "height": 0.1366434395313263
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

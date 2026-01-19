@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765291573685-rx85zs.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765291573685-rx85zs.JPG",
+  "timestamp": "2025-12-09T14:49:50.981Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.649,
+      "bbox": {
+        "x1": 1860.931396484375,
+        "y1": 1159.9930419921875,
+        "x2": 1981.070068359375,
+        "y2": 1394.2017822265625,
+        "width": 120.138671875,
+        "height": 234.208740234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.6403335928916931,
+        "y_center": 0.5675988793373108,
+        "width": 0.040046222507953644,
+        "height": 0.10409277677536011
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.441,
+      "bbox": {
+        "x1": 1644.409423828125,
+        "y1": 1070.5836181640625,
+        "x2": 1756.90478515625,
+        "y2": 1315.0537109375,
+        "width": 112.495361328125,
+        "height": 244.4700927734375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5668857097625732,
+        "y_center": 0.5301415920257568,
+        "width": 0.03749845549464226,
+        "height": 0.10865337401628494
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

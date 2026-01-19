@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765291574111-gf89oo.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765291574111-gf89oo.JPG",
+  "timestamp": "2025-12-09T14:52:31.301Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.663,
+      "bbox": {
+        "x1": 85.80093383789062,
+        "y1": 0,
+        "x2": 2997.1201171875,
+        "y2": 2244.068115234375,
+        "width": 2911.319091796875,
+        "height": 2244.068115234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5138201713562012,
+        "y_center": 0.49868181347846985,
+        "width": 0.9704396724700928,
+        "height": 0.9973636269569397
+      }
+    },
+    {
+      "class": "tie",
+      "class_id": 27,
+      "confidence": 0.567,
+      "bbox": {
+        "x1": 1636.453857421875,
+        "y1": 262.5639953613281,
+        "x2": 1782.6318359375,
+        "y2": 697.4441528320312,
+        "width": 146.177978515625,
+        "height": 434.8801574707031
+      },
+      "bbox_normalized": {
+        "x_center": 0.5698476433753967,
+        "y_center": 0.21333515644073486,
+        "width": 0.04872599244117737,
+        "height": 0.19328007102012634
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

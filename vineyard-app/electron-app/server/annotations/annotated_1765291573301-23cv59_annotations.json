@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765291573301-23cv59.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765291573301-23cv59.JPG",
+  "timestamp": "2025-12-09T14:47:37.545Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "dog",
+      "class_id": 16,
+      "confidence": 0.55,
+      "bbox": {
+        "x1": 1366.332275390625,
+        "y1": 1509.0748291015625,
+        "x2": 1904.6702880859375,
+        "y2": 1852.2264404296875,
+        "width": 538.3380126953125,
+        "height": 343.151611328125
+      },
+      "bbox_normalized": {
+        "x_center": 0.545167088508606,
+        "y_center": 0.7469558119773865,
+        "width": 0.1794459968805313,
+        "height": 0.1525118201971054
+      }
+    },
+    {
+      "class": "frisbee",
+      "class_id": 29,
+      "confidence": 0.356,
+      "bbox": {
+        "x1": 1708.2552490234375,
+        "y1": 1807.861572265625,
+        "x2": 1838.40380859375,
+        "y2": 2035.477783203125,
+        "width": 130.1485595703125,
+        "height": 227.6162109375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5911098718643188,
+        "y_center": 0.8540754318237305,
+        "width": 0.043382853269577026,
+        "height": 0.10116276144981384
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

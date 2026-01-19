@@ -1,0 +1,50 @@
+{
+  "image": "DJI_20251115160146_0005_V.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/1765035656164-dr3mjs.JPG",
+  "timestamp": "2025-12-06T15:41:00.937Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.871,
+      "bbox": {
+        "x1": 291.32684326171875,
+        "y1": 1834.5576171875,
+        "x2": 706.017822265625,
+        "y2": 2270.746826171875,
+        "width": 414.69097900390625,
+        "height": 436.189208984375
+      },
+      "bbox_normalized": {
+        "x_center": 0.12466808408498764,
+        "y_center": 0.6842174530029297,
+        "width": 0.10367274284362793,
+        "height": 0.1453963965177536
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.596,
+      "bbox": {
+        "x1": 749.5106201171875,
+        "y1": 1201.982666015625,
+        "x2": 1002.29150390625,
+        "y2": 1647.2879638671875,
+        "width": 252.7808837890625,
+        "height": 445.3052978515625
+      },
+      "bbox_normalized": {
+        "x_center": 0.2189752608537674,
+        "y_center": 0.4748784303665161,
+        "width": 0.06319522112607956,
+        "height": 0.1484351009130478
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

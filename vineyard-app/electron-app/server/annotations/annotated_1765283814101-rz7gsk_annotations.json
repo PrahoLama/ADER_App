@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765283814101-rz7gsk.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283814101-rz7gsk.JPG",
+  "timestamp": "2025-12-09T12:40:41.104Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "sports ball",
+      "class_id": 32,
+      "confidence": 0.482,
+      "bbox": {
+        "x1": 376.04925537109375,
+        "y1": 216.04443359375,
+        "x2": 389.0303955078125,
+        "y2": 230.8038330078125,
+        "width": 12.98114013671875,
+        "height": 14.7593994140625
+      },
+      "bbox_normalized": {
+        "x_center": 0.5977184772491455,
+        "y_center": 0.4363752603530884,
+        "width": 0.020283032208681107,
+        "height": 0.02882695198059082
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.359,
+      "bbox": {
+        "x1": 354.48236083984375,
+        "y1": 110.7637939453125,
+        "x2": 368.2142333984375,
+        "y2": 144.10568237304688,
+        "width": 13.73187255859375,
+        "height": 33.341888427734375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5646067261695862,
+        "y_center": 0.24889597296714783,
+        "width": 0.021456051617860794,
+        "height": 0.0651208758354187
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

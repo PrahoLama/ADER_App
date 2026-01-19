@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280172073-8h5nsr.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280172073-8h5nsr.JPG",
+  "timestamp": "2025-12-09T11:48:20.754Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "kite",
+      "class_id": 33,
+      "confidence": 0.414,
+      "bbox": {
+        "x1": 2338.69677734375,
+        "y1": 216.95802307128906,
+        "x2": 2477.89697265625,
+        "y2": 336.36737060546875,
+        "width": 139.2001953125,
+        "height": 119.40934753417969
+      },
+      "bbox_normalized": {
+        "x_center": 0.8027656078338623,
+        "y_center": 0.12296119332313538,
+        "width": 0.04640006646513939,
+        "height": 0.05307082086801529
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

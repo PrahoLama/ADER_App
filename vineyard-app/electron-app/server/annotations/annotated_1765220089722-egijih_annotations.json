@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765220089722-egijih.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765220089722-egijih.JPG",
+  "timestamp": "2025-12-08T18:57:20.111Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.321,
+      "bbox": {
+        "x1": 469.04547119140625,
+        "y1": 393.3363952636719,
+        "x2": 521.4225463867188,
+        "y2": 463.0123596191406,
+        "width": 52.3770751953125,
+        "height": 69.67596435546875
+      },
+      "bbox_normalized": {
+        "x_center": 0.7738031148910522,
+        "y_center": 0.8362780809402466,
+        "width": 0.0818391814827919,
+        "height": 0.1360858678817749
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

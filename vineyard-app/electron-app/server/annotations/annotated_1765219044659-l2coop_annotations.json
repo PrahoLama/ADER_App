@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765219044659-l2coop.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765219044659-l2coop.JPG",
+  "timestamp": "2025-12-08T18:40:14.668Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "truck",
+      "class_id": 7,
+      "confidence": 0.453,
+      "bbox": {
+        "x1": 2435.8818359375,
+        "y1": 992.236328125,
+        "x2": 2748.0341796875,
+        "y2": 1175.5316162109375,
+        "width": 312.15234375,
+        "height": 183.2952880859375
+      },
+      "bbox_normalized": {
+        "x_center": 0.8639860153198242,
+        "y_center": 0.4817262291908264,
+        "width": 0.10405077785253525,
+        "height": 0.08146457374095917
+      }
+    },
+    {
+      "class": "train",
+      "class_id": 6,
+      "confidence": 0.424,
+      "bbox": {
+        "x1": 1858.462646484375,
+        "y1": 760.7672729492188,
+        "x2": 2038.53662109375,
+        "y2": 904.3817749023438,
+        "width": 180.073974609375,
+        "height": 143.614501953125
+      },
+      "bbox_normalized": {
+        "x_center": 0.6494998931884766,
+        "y_center": 0.3700331151485443,
+        "width": 0.06002465635538101,
+        "height": 0.06382866948843002
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

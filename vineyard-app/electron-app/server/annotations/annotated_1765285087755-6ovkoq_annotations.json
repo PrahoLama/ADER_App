@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765285087755-6ovkoq.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285087755-6ovkoq.JPG",
+  "timestamp": "2025-12-09T13:13:29.782Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.886,
+      "bbox": {
+        "x1": 513.0877685546875,
+        "y1": 199.73484802246094,
+        "x2": 590.7991943359375,
+        "y2": 312.4801025390625,
+        "width": 77.71142578125,
+        "height": 112.74525451660156
+      },
+      "bbox_normalized": {
+        "x_center": 0.8624116778373718,
+        "y_center": 0.5002099275588989,
+        "width": 0.121424101293087,
+        "height": 0.22020557522773743
+      }
+    },
+    {
+      "class": "book",
+      "class_id": 73,
+      "confidence": 0.448,
+      "bbox": {
+        "x1": 3.7480316162109375,
+        "y1": 1.0594482421875,
+        "x2": 233.71853637695312,
+        "y2": 374.9436340332031,
+        "width": 229.9705047607422,
+        "height": 373.8841857910156
+      },
+      "bbox_normalized": {
+        "x_center": 0.18552075326442719,
+        "y_center": 0.36719051003456116,
+        "width": 0.3593289256095886,
+        "height": 0.7302425503730774
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

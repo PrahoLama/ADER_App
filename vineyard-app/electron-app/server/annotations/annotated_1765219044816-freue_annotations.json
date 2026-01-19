@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765219044816-freue.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765219044816-freue.JPG",
+  "timestamp": "2025-12-08T18:41:16.855Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.397,
+      "bbox": {
+        "x1": 335.1068115234375,
+        "y1": 239.37966918945312,
+        "x2": 345.6328125,
+        "y2": 258.7091979980469,
+        "width": 10.5260009765625,
+        "height": 19.32952880859375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5318278074264526,
+        "y_center": 0.48641490936279297,
+        "width": 0.016446877270936966,
+        "height": 0.03775298595428467
+      }
+    },
+    {
+      "class": "boat",
+      "class_id": 8,
+      "confidence": 0.256,
+      "bbox": {
+        "x1": 454.93798828125,
+        "y1": 253.70140075683594,
+        "x2": 494.9798583984375,
+        "y2": 297.2939453125,
+        "width": 40.0418701171875,
+        "height": 43.59254455566406
+      },
+      "bbox_normalized": {
+        "x_center": 0.7421233057975769,
+        "y_center": 0.5380814075469971,
+        "width": 0.06256542354822159,
+        "height": 0.08514168858528137
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

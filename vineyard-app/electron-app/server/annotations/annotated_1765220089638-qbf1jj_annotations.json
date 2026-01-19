@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765220089638-qbf1jj.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765220089638-qbf1jj.JPG",
+  "timestamp": "2025-12-08T18:56:45.950Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "toothbrush",
+      "class_id": 79,
+      "confidence": 0.377,
+      "bbox": {
+        "x1": 306.04046630859375,
+        "y1": 271.448974609375,
+        "x2": 336.67742919921875,
+        "y2": 505.56640625,
+        "width": 30.636962890625,
+        "height": 234.117431640625
+      },
+      "bbox_normalized": {
+        "x_center": 0.5021233558654785,
+        "y_center": 0.7588040828704834,
+        "width": 0.04787025600671768,
+        "height": 0.4572606086730957
+      }
+    },
+    {
+      "class": "toothbrush",
+      "class_id": 79,
+      "confidence": 0.322,
+      "bbox": {
+        "x1": 516.8201904296875,
+        "y1": 235.677490234375,
+        "x2": 556.9459228515625,
+        "y2": 457.57647705078125,
+        "width": 40.125732421875,
+        "height": 221.89898681640625
+      },
+      "bbox_normalized": {
+        "x_center": 0.8388797640800476,
+        "y_center": 0.6770058274269104,
+        "width": 0.06269645690917969,
+        "height": 0.43339645862579346
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

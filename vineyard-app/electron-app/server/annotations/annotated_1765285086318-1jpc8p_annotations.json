@@ -1,0 +1,69 @@
+{
+  "image": "annotated_1765285086318-1jpc8p.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285086318-1jpc8p.JPG",
+  "timestamp": "2025-12-09T13:04:38.133Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.512,
+      "bbox": {
+        "x1": 264.57916259765625,
+        "y1": 67.37481689453125,
+        "x2": 344.65106201171875,
+        "y2": 231.60086059570312,
+        "width": 80.0718994140625,
+        "height": 164.22604370117188
+      },
+      "bbox_normalized": {
+        "x_center": 0.4759611189365387,
+        "y_center": 0.291968435049057,
+        "width": 0.12511233985424042,
+        "height": 0.3207539916038513
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.407,
+      "bbox": {
+        "x1": 322.0078125,
+        "y1": 107.26412963867188,
+        "x2": 411.05743408203125,
+        "y2": 276.04693603515625,
+        "width": 89.04962158203125,
+        "height": 168.78280639648438
+      },
+      "bbox_normalized": {
+        "x_center": 0.5727072358131409,
+        "y_center": 0.3743272125720978,
+        "width": 0.1391400396823883,
+        "height": 0.32965391874313354
+      }
+    },
+    {
+      "class": "sports ball",
+      "class_id": 32,
+      "confidence": 0.395,
+      "bbox": {
+        "x1": 307.3719482421875,
+        "y1": 68.16876220703125,
+        "x2": 338.40863037109375,
+        "y2": 98.51713562011719,
+        "width": 31.03668212890625,
+        "height": 30.348373413085938
+      },
+      "bbox_normalized": {
+        "x_center": 0.504516065120697,
+        "y_center": 0.16277919709682465,
+        "width": 0.048494815826416016,
+        "height": 0.05927416682243347
+      }
+    }
+  ],
+  "detection_count": 3,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

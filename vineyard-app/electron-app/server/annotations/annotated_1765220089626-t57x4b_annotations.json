@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765220089626-t57x4b.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765220089626-t57x4b.JPG",
+  "timestamp": "2025-12-08T18:56:42.707Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "baseball bat",
+      "class_id": 34,
+      "confidence": 0.252,
+      "bbox": {
+        "x1": 306.3880615234375,
+        "y1": 152.64064025878906,
+        "x2": 341.1658935546875,
+        "y2": 434.3109130859375,
+        "width": 34.77783203125,
+        "height": 281.6702880859375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5059015154838562,
+        "y_center": 0.5731948614120483,
+        "width": 0.054340362548828125,
+        "height": 0.5501372814178467
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

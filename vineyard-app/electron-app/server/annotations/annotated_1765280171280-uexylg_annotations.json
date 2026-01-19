@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280171280-uexylg.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171280-uexylg.JPG",
+  "timestamp": "2025-12-09T11:42:42.108Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "fire hydrant",
+      "class_id": 10,
+      "confidence": 0.907,
+      "bbox": {
+        "x1": 326.7498779296875,
+        "y1": 34.448909759521484,
+        "x2": 354.5711669921875,
+        "y2": 112.0894775390625,
+        "width": 27.8212890625,
+        "height": 77.64056396484375
+      },
+      "bbox_normalized": {
+        "x_center": 0.5322820544242859,
+        "y_center": 0.14310389757156372,
+        "width": 0.04347076267004013,
+        "height": 0.15164172649383545
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

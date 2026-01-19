@@ -1,0 +1,88 @@
+{
+  "image": "annotated_1765283813967-8jni2.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283813967-8jni2.JPG",
+  "timestamp": "2025-12-09T12:39:51.478Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.62,
+      "bbox": {
+        "x1": 357.4114685058594,
+        "y1": 325.0167236328125,
+        "x2": 377.1317443847656,
+        "y2": 380.241455078125,
+        "width": 19.72027587890625,
+        "height": 55.2247314453125
+      },
+      "bbox_normalized": {
+        "x_center": 0.5738618969917297,
+        "y_center": 0.6887286901473999,
+        "width": 0.030812930315732956,
+        "height": 0.10786080360412598
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.594,
+      "bbox": {
+        "x1": 319.04736328125,
+        "y1": 321.5565185546875,
+        "x2": 338.76458740234375,
+        "y2": 384.45263671875,
+        "width": 19.71722412109375,
+        "height": 62.8961181640625
+      },
+      "bbox_normalized": {
+        "x_center": 0.5139155983924866,
+        "y_center": 0.6894620656967163,
+        "width": 0.030808161944150925,
+        "height": 0.12284398078918457
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.442,
+      "bbox": {
+        "x1": 305.9740295410156,
+        "y1": 333.181884765625,
+        "x2": 324.2947082519531,
+        "y2": 388.005126953125,
+        "width": 18.3206787109375,
+        "height": 54.8232421875
+      },
+      "bbox_normalized": {
+        "x_center": 0.4923974573612213,
+        "y_center": 0.7042841911315918,
+        "width": 0.028626060113310814,
+        "height": 0.10707664489746094
+      }
+    },
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.377,
+      "bbox": {
+        "x1": 488.32427978515625,
+        "y1": 287.6042785644531,
+        "x2": 635.1332397460938,
+        "y2": 380.6231384277344,
+        "width": 146.8089599609375,
+        "height": 93.01885986328125
+      },
+      "bbox_normalized": {
+        "x_center": 0.8777011632919312,
+        "y_center": 0.6525658369064331,
+        "width": 0.2293889969587326,
+        "height": 0.1816774606704712
+      }
+    }
+  ],
+  "detection_count": 4,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

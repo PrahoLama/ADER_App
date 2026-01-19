@@ -34,12 +34,30 @@ export default function App() {
   const [rowsGeojson, setRowsGeojson] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [clusteringMethod, setClusteringMethod] = useState('kmeans');
-  const [annotationImages, setAnnotationImages] = useState([]); // NEW: for image annotation
+  const [annotationImages, setAnnotationImages] = useState([]); // for image annotation feature
   const [yoloIndustry, setYoloIndustry] = useState('agriculture'); // YOLO industry mode
   const [yoloConfidence, setYoloConfidence] = useState(0.25); // YOLO confidence threshold
   const [enableAutoAnnotation, setEnableAutoAnnotation] = useState(true); // Toggle YOLO
   const [yoloResults, setYoloResults] = useState(null); // YOLO detection results
   const [currentAnnotationIndex, setCurrentAnnotationIndex] = useState(0); // Current image being reviewed
+  
+  // Interactive Annotation Editor states
+  const [annotationEditorVisible, setAnnotationEditorVisible] = useState(false);
+  const [editingAnnotations, setEditingAnnotations] = useState([]); // Current detections being edited
+  const [selectedDetection, setSelectedDetection] = useState(null); // Currently selected box
+  const [isDrawingNewBox, setIsDrawingNewBox] = useState(false); // Drawing a new bounding box
+  const [newBoxStart, setNewBoxStart] = useState(null); // Start point of new box
+  const [newBoxEnd, setNewBoxEnd] = useState(null); // End point of new box
+  const [isDraggingBox, setIsDraggingBox] = useState(false); // Dragging selected box
+  const [isResizingBox, setIsResizingBox] = useState(false); // Resizing selected box
+  const [resizeHandle, setResizeHandle] = useState(null); // Which corner is being resized
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // Offset for dragging
+  const [editingImageData, setEditingImageData] = useState(null); // Image being edited
+  const [availableLabels, setAvailableLabels] = useState(['vine', 'grape', 'diseased', 'healthy', 'missing', 'person', 'car', 'other']); // Label options
+  const [customLabelInput, setCustomLabelInput] = useState(''); // Custom label input
+  const [editorImageDimensions, setEditorImageDimensions] = useState({ width: 4000, height: 3000 }); // Actual image dimensions
+  const [newBoxLabel, setNewBoxLabel] = useState('vine'); // Label for new boxes being drawn
+  const annotationCanvasRef = useRef(null);
   
   // NEW FEATURES: Orthomosaic Generator & Manual Row Digitizer
   const [orthomosaicProjects, setOrthomosaicProjects] = useState([]);
@@ -61,18 +79,6 @@ export default function App() {
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState(null);
   const canvasRef = useRef(null);
-  
-  // Manual Annotation Tool states (LabelImg-like)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [annotations, setAnnotations] = useState([]); // Array of {imageId, boxes: [{x, y, width, height, label, type: 'manual'|'yolo'}]}
-  const [currentBox, setCurrentBox] = useState(null); // Currently drawing box
-  const [isDrawingBox, setIsDrawingBox] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState('vine');
-  const [customLabels, setCustomLabels] = useState(['vine', 'dead_vine', 'gap', 'soil', 'vegetation']);
-  const [selectedBoxIndex, setSelectedBoxIndex] = useState(null);
-  const [showLabelInput, setShowLabelInput] = useState(false);
-  const [newLabelText, setNewLabelText] = useState('');
-  const annotationCanvasRef = useRef(null);
   
   // Progress tracking for batch processing
   const [processingProgress, setProcessingProgress] = useState({
@@ -327,191 +333,6 @@ export default function App() {
     };
   }, [isDrawingRow, currentRow, drawnRows, zoomLevel, panOffset, isPanning, lastPanPoint]);
 
-  // Manual Annotation Canvas Logic
-  useEffect(() => {
-    try {
-      if (analysisType !== 'manual-annotation') return;
-      if (!annotationCanvasRef.current || annotationImages.length === 0) return;
-      
-      const canvas = annotationCanvasRef.current;
-      if (!canvas || !canvas.getContext) {
-        console.warn('Canvas not available');
-        return;
-      }
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        console.error('Failed to get 2D context');
-        return;
-      }
-      
-      const currentImage = annotationImages[currentImageIndex];
-      
-      if (!currentImage || !currentImage.uri) {
-        console.warn('No current image or URI');
-        return;
-      }
-      
-      console.log('Loading image:', currentImage.name);
-      
-      const img = typeof window !== 'undefined' && window.Image ? new window.Image() : new Image();
-      img.crossOrigin = 'anonymous';
-      
-      img.onload = () => {
-        try {
-          console.log('Image loaded successfully:', img.width, 'x', img.height);
-          
-          // Scale down large images to fit on screen (max 1200px width)
-          const maxWidth = 1200;
-          let displayWidth = img.width;
-          let displayHeight = img.height;
-          let scale = 1;
-          
-          if (img.width > maxWidth) {
-            scale = maxWidth / img.width;
-            displayWidth = maxWidth;
-            displayHeight = img.height * scale;
-          }
-          
-          canvas.width = displayWidth;
-          canvas.height = displayHeight;
-          
-          // Draw image scaled
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-          
-          // Store scale for coordinate calculations
-          canvas.dataset.scale = scale;
-          canvas.dataset.originalWidth = img.width;
-          canvas.dataset.originalHeight = img.height;
-          
-          // Draw existing boxes (scaled)
-          const currentAnnotations = annotations[currentImageIndex]?.boxes || [];
-          currentAnnotations.forEach((box, idx) => {
-            const isSelected = idx === selectedBoxIndex;
-            const color = box.type === 'yolo' ? '#3b82f6' : '#10b981';
-            
-            ctx.strokeStyle = isSelected ? '#fbbf24' : color;
-            ctx.lineWidth = isSelected ? 3 : 2;
-            ctx.strokeRect(box.x * scale, box.y * scale, box.width * scale, box.height * scale);
-            
-            // Draw label background
-            ctx.fillStyle = isSelected ? '#fbbf24' : color;
-            const labelText = `${box.label}`;
-            ctx.font = '14px Arial';
-            const textWidth = ctx.measureText(labelText).width;
-            ctx.fillRect(box.x * scale, box.y * scale - 20, textWidth + 8, 20);
-            
-            // Draw label text
-            ctx.fillStyle = '#fff';
-            ctx.fillText(labelText, box.x * scale + 4, box.y * scale - 6);
-          });
-          
-          // Draw current box being drawn (scaled)
-          if (currentBox) {
-            ctx.strokeStyle = '#ef4444';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.strokeRect(currentBox.x * scale, currentBox.y * scale, currentBox.width * scale, currentBox.height * scale);
-            ctx.setLineDash([]);
-          }
-          
-          console.log('Canvas rendered successfully');
-        } catch (error) {
-          console.error('Error drawing on canvas:', error);
-        }
-      };
-      
-      img.onerror = (error) => {
-        console.error('Error loading image:', currentImage.name, error);
-        alert('Failed to load image: ' + currentImage.name);
-      };
-      
-      img.src = currentImage.uri;
-    } catch (error) {
-      console.error('❌ Critical error in annotation useEffect:', error);
-    }
-    
-    let startX, startY;
-    
-    const handleMouseDown = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
-      
-      // Check if clicking on existing box
-      const currentAnnotations = annotations[currentImageIndex]?.boxes || [];
-      const clickedBoxIndex = currentAnnotations.findIndex(box =>
-        x >= box.x && x <= box.x + box.width &&
-        y >= box.y && y <= box.y + box.height
-      );
-      
-      if (clickedBoxIndex !== -1) {
-        setSelectedBoxIndex(clickedBoxIndex);
-      } else {
-        // Start drawing new box
-        setIsDrawingBox(true);
-        startX = x;
-        startY = y;
-        setSelectedBoxIndex(null);
-      }
-    };
-    
-    const handleMouseMove = (e) => {
-      if (!isDrawingBox) return;
-      
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
-      
-      const width = x - startX;
-      const height = y - startY;
-      
-      setCurrentBox({ x: startX, y: startY, width, height });
-    };
-    
-    const handleMouseUp = (e) => {
-      if (!isDrawingBox || !currentBox) return;
-      
-      if (Math.abs(currentBox.width) > 10 && Math.abs(currentBox.height) > 10) {
-        const normalizedBox = {
-          x: currentBox.width < 0 ? currentBox.x + currentBox.width : currentBox.x,
-          y: currentBox.height < 0 ? currentBox.y + currentBox.height : currentBox.y,
-          width: Math.abs(currentBox.width),
-          height: Math.abs(currentBox.height),
-          label: selectedLabel,
-          type: 'manual'
-        };
-        
-        const updated = [...annotations];
-        if (!updated[currentImageIndex]) {
-          updated[currentImageIndex] = { imageId: currentImageIndex, imageName: annotationImages[currentImageIndex].name, boxes: [] };
-        }
-        updated[currentImageIndex].boxes.push(normalizedBox);
-        setAnnotations(updated);
-      }
-      
-      setIsDrawingBox(false);
-      setCurrentBox(null);
-    };
-    
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('mouseleave', handleMouseUp);
-    
-    return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('mouseleave', handleMouseUp);
-    };
-  }, [annotationImages, currentImageIndex, annotations, selectedBoxIndex, currentBox, isDrawingBox]);
-
   const checkBackendHealth = async () => {
     console.log('🔍 Checking backend health at:', `http://${backendIP}:${BACKEND_PORT}/api/health`);
     try {
@@ -580,7 +401,7 @@ export default function App() {
     }
   };
 
-  // NEW: Pick images for annotation
+  // Pick images for annotation
   const pickAnnotationImages = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -615,7 +436,7 @@ export default function App() {
     }
   };
 
-  // NEW: Remove annotation image
+  // Remove annotation image
   const removeAnnotationImage = (index) => {
     setAnnotationImages(annotationImages.filter((_, i) => i !== index));
   };
@@ -758,6 +579,361 @@ export default function App() {
     } catch (error) {
       showAlert('Error', 'Failed to update annotations: ' + error.message);
     }
+  };
+
+  // ==================== ANNOTATION EDITOR FUNCTIONS ====================
+  
+  // Open annotation editor for a specific image
+  const openAnnotationEditor = (result, index) => {
+    if (!result || !result.annotations) {
+      showAlert('Error', 'No annotation data available for this image');
+      return;
+    }
+    
+    // Copy detections to editing state
+    const detections = result.annotations.detections?.map((det, idx) => ({
+      ...det,
+      id: idx,
+      isModified: false
+    })) || [];
+    
+    // Get image dimensions from annotation data or use defaults
+    const imageSize = result.annotations.image_size || {};
+    const imgWidth = imageSize.width || result.annotations.image_width || 4000;
+    const imgHeight = imageSize.height || result.annotations.image_height || 3000;
+    console.log('📐 Annotation image_size:', result.annotations.image_size);
+    console.log('📐 Using dimensions:', imgWidth, 'x', imgHeight);
+    console.log('📐 Detections:', result.annotations.detections?.length || 0);
+    if (result.annotations.detections?.length > 0) {
+      console.log('📐 First detection bbox:', result.annotations.detections[0].bbox);
+    }
+    setEditorImageDimensions({ width: imgWidth, height: imgHeight });
+    
+    // Also try to load actual image dimensions from the image file
+    if (Platform.OS === 'web') {
+      const img = new window.Image();
+      img.onload = () => {
+        setEditorImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        console.log('📐 Loaded image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+      };
+      img.src = `${BACKEND_URL.replace('/api', '')}/uploads/${result.original_image || result.image}`;
+    }
+    
+    setEditingAnnotations(detections);
+    setEditingImageData({
+      index,
+      image: result.image,
+      originalImage: result.original_image || result.image,
+      annotated_image: result.annotated_image,
+      annotations: result.annotations
+    });
+    setSelectedDetection(null);
+    setAnnotationEditorVisible(true);
+    setCurrentAnnotationIndex(index);
+  };
+
+  // Close annotation editor
+  const closeAnnotationEditor = async (saveChanges = false) => {
+    if (saveChanges && editingImageData) {
+      // Save changes back to results (with alert)
+      await saveAnnotationChanges(true);
+    }
+    
+    setAnnotationEditorVisible(false);
+    setEditingAnnotations([]);
+    setEditingImageData(null);
+    setSelectedDetection(null);
+    setIsDrawingNewBox(false);
+    setNewBoxStart(null);
+    setNewBoxEnd(null);
+  };
+
+  // Save annotation changes to backend
+  const saveAnnotationChanges = async (showSuccessAlert = true) => {
+    if (!editingImageData) return;
+    
+    try {
+      setLoading(true);
+      
+      // Extract imageId from the annotation file (keep annotated_ prefix as that's the file naming convention)
+      const imageId = editingImageData.annotations?.image?.replace(/\.[^/.]+$/, '');
+      console.log('💾 Saving annotations for imageId:', imageId);
+      
+      // Update local results state
+      if (results?.data?.yoloResults) {
+        const updatedResults = [...results.data.yoloResults];
+        updatedResults[editingImageData.index] = {
+          ...updatedResults[editingImageData.index],
+          annotations: {
+            ...updatedResults[editingImageData.index].annotations,
+            detections: editingAnnotations.map(det => ({
+              class: det.class,
+              class_id: det.class_id,
+              confidence: det.confidence,
+              bbox: det.bbox,
+              bbox_normalized: det.bbox_normalized
+            })),
+            detection_count: editingAnnotations.length,
+            status: 'corrected'
+          }
+        };
+        
+        setResults({
+          ...results,
+          data: {
+            ...results.data,
+            yoloResults: updatedResults
+          }
+        });
+      }
+      
+      // Save to backend if we have an imageId
+      if (imageId) {
+        await axios.put(`${BACKEND_URL}/annotations/${imageId}`, {
+          detections: editingAnnotations,
+          status: 'corrected'
+        });
+      }
+      
+      setLoading(false);
+      if (showSuccessAlert) {
+        showAlert('Success', 'Annotations saved successfully!');
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Failed to save annotations:', error);
+      if (showSuccessAlert) {
+        showAlert('Error', 'Failed to save annotations: ' + error.message);
+      }
+    }
+  };
+
+  // Delete selected detection
+  const deleteSelectedDetection = () => {
+    if (selectedDetection === null) {
+      showAlert('Info', 'Please select a bounding box to delete');
+      return;
+    }
+    
+    setEditingAnnotations(prev => prev.filter((_, idx) => idx !== selectedDetection));
+    setSelectedDetection(null);
+  };
+
+  // Change label of selected detection
+  const changeDetectionLabel = (newLabel, classId = 0) => {
+    if (selectedDetection === null) return;
+    
+    setEditingAnnotations(prev => prev.map((det, idx) => 
+      idx === selectedDetection 
+        ? { ...det, class: newLabel, class_id: classId, isModified: true }
+        : det
+    ));
+  };
+
+  // Add new detection box
+  const addNewDetection = (bbox, label = 'vine') => {
+    const newDetection = {
+      id: editingAnnotations.length,
+      class: label,
+      class_id: availableLabels.indexOf(label),
+      confidence: 1.0, // Manual annotation = 100% confidence
+      bbox: {
+        x1: Math.min(bbox.x1, bbox.x2),
+        y1: Math.min(bbox.y1, bbox.y2),
+        x2: Math.max(bbox.x1, bbox.x2),
+        y2: Math.max(bbox.y1, bbox.y2),
+        width: Math.abs(bbox.x2 - bbox.x1),
+        height: Math.abs(bbox.y2 - bbox.y1)
+      },
+      bbox_normalized: {}, // Will be calculated when exporting
+      isModified: true,
+      isManual: true
+    };
+    
+    setEditingAnnotations(prev => [...prev, newDetection]);
+    setSelectedDetection(editingAnnotations.length);
+  };
+
+  // Update detection position (for drag)
+  const updateDetectionPosition = (index, dx, dy) => {
+    setEditingAnnotations(prev => prev.map((det, idx) => {
+      if (idx !== index) return det;
+      return {
+        ...det,
+        bbox: {
+          ...det.bbox,
+          x1: det.bbox.x1 + dx,
+          y1: det.bbox.y1 + dy,
+          x2: det.bbox.x2 + dx,
+          y2: det.bbox.y2 + dy
+        },
+        isModified: true
+      };
+    }));
+  };
+
+  // Update detection size (for resize)
+  const updateDetectionSize = (index, newBbox) => {
+    setEditingAnnotations(prev => prev.map((det, idx) => {
+      if (idx !== index) return det;
+      return {
+        ...det,
+        bbox: {
+          x1: Math.min(newBbox.x1, newBbox.x2),
+          y1: Math.min(newBbox.y1, newBbox.y2),
+          x2: Math.max(newBbox.x1, newBbox.x2),
+          y2: Math.max(newBbox.y1, newBbox.y2),
+          width: Math.abs(newBbox.x2 - newBbox.x1),
+          height: Math.abs(newBbox.y2 - newBbox.y1)
+        },
+        isModified: true
+      };
+    }));
+  };
+
+  // Export corrected annotations as PNG
+  const exportAnnotatedImage = async () => {
+    if (!editingImageData) return;
+    
+    try {
+      setLoading(true);
+      
+      // First save the current annotations to ensure backend has latest
+      await saveAnnotationChanges(false);
+      
+      const imageId = editingImageData.annotations?.image?.replace(/\.[^/.]+$/, '');
+      
+      const response = await axios.post(`${BACKEND_URL}/annotations/${imageId}/export`, {
+        format: 'png'
+      });
+      
+      if (response.data.success && response.data.base64) {
+        // Download the image
+        if (Platform.OS === 'web') {
+          const link = document.createElement('a');
+          link.href = response.data.base64;
+          link.download = `corrected_${editingImageData.image}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        showAlert('Success', 'Corrected image exported!');
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      showAlert('Error', 'Failed to export image: ' + error.message);
+    }
+  };
+
+  // Export JSON annotation file for current image
+  const exportAnnotationJSON = async () => {
+    if (!editingImageData) return;
+    
+    try {
+      const imageId = editingImageData.annotations?.image?.replace(/\.[^/.]+$/, '');
+      
+      // Create JSON with current annotations
+      const annotationData = {
+        image: editingImageData.image,
+        image_path: editingImageData.annotations?.image_path,
+        timestamp: new Date().toISOString(),
+        image_size: editorImageDimensions,
+        detections: editingAnnotations.map(det => ({
+          class: det.class,
+          class_id: det.class_id || 0,
+          confidence: det.confidence,
+          bbox: det.bbox,
+          bbox_normalized: det.bbox_normalized || {},
+          isManual: det.isManual || false
+        })),
+        detection_count: editingAnnotations.length,
+        status: 'corrected'
+      };
+      
+      // Download JSON
+      if (Platform.OS === 'web') {
+        const blob = new Blob([JSON.stringify(annotationData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${imageId}_annotations.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+      
+      showAlert('Success', 'JSON annotations exported!');
+    } catch (error) {
+      showAlert('Error', 'Failed to export JSON: ' + error.message);
+    }
+  };
+
+  // Export both image and JSON
+  const exportBoth = async () => {
+    if (!editingImageData) return;
+    
+    try {
+      setLoading(true);
+      await exportAnnotatedImage();
+      await exportAnnotationJSON();
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      showAlert('Error', 'Failed to export: ' + error.message);
+    }
+  };
+
+  // Download all modified/corrected annotations as ZIP
+  const downloadAllModified = async () => {
+    try {
+      setDownloadingZip(true);
+      
+      const response = await axios.get(`${BACKEND_URL}/download-modified`, {
+        responseType: 'blob'
+      });
+      
+      if (Platform.OS === 'web') {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `modified_annotations_${Date.now()}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+      
+      setDownloadingZip(false);
+      showAlert('Success', 'Downloaded all modified annotations as ZIP!');
+    } catch (error) {
+      setDownloadingZip(false);
+      if (error.response?.status === 404) {
+        showAlert('Info', 'No modified annotations found. Edit some annotations first!');
+      } else {
+        showAlert('Error', 'Failed to download: ' + error.message);
+      }
+    }
+  };
+
+  // Navigate to next/previous image in editor
+  const navigateAnnotationEditor = async (direction) => {
+    if (!results?.data?.yoloResults) return;
+    
+    const totalImages = results.data.yoloResults.length;
+    let newIndex = currentAnnotationIndex + direction;
+    
+    if (newIndex < 0) newIndex = totalImages - 1;
+    if (newIndex >= totalImages) newIndex = 0;
+    
+    // Save current changes silently (don't show alert)
+    await saveAnnotationChanges(false);
+    
+    // Open next image
+    const nextResult = results.data.yoloResults[newIndex];
+    openAnnotationEditor(nextResult, newIndex);
   };
 
   // Export annotations
@@ -1611,19 +1787,6 @@ export default function App() {
                 Generate comprehensive training dataset with DJI metadata + YOLO detection boxes in JSON format
               </Text>
             </TouchableOpacity>
-
-            {/* Manual Annotation Tool (LabelImg-like) */}
-            <TouchableOpacity
-              style={[styles.card, styles.cardManualAnnotation, backendStatus !== 'connected' && styles.cardDisabled]}
-              onPress={() => backendStatus === 'connected' && setAnalysisType('manual-annotation')}
-              disabled={backendStatus !== 'connected'}
-            >
-              <Text style={styles.cardEmoji}>✏️</Text>
-              <Text style={styles.cardTitle}>Manual Annotation Tool</Text>
-              <Text style={styles.cardDesc}>
-                Draw bounding boxes, add labels, edit or delete YOLO annotations. Export to JSON format
-              </Text>
-            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -2390,258 +2553,6 @@ export default function App() {
                     {orthomosaicProcessingStatus}
                   </Text>
                 </View>
-              )}
-            </>
-          ) : analysisType === 'manual-annotation' ? (
-            <>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>✏️ Manual Annotation Tool</Text>
-                <Text style={styles.sectionDesc}>
-                  Draw bounding boxes, add labels, edit or delete existing annotations
-                </Text>
-              </View>
-
-              <View style={styles.infoBox}>
-                <Text style={styles.infoEmoji}>💡</Text>
-                <Text style={styles.infoText}>
-                  Load images with existing YOLO annotations or start fresh. Draw boxes by click-drag. Edit labels, delete boxes, and export to JSON.
-                </Text>
-              </View>
-
-              {/* Step 1: Load Images */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Step 1: Load Images</Text>
-                <Text style={styles.sectionDesc}>
-                  Upload images to annotate (.jpg, .png, .tif)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.uploadBtn}
-                onPress={async () => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.multiple = true;
-                  input.accept = '.jpg,.jpeg,.png,.tif,.tiff';
-                  input.onchange = async (e) => {
-                    try {
-                      const files = Array.from(e.target.files);
-                      if (files.length === 0) return;
-                      
-                      const imageData = files.map(file => ({
-                        uri: URL.createObjectURL(file),
-                        name: file.name,
-                        file: file
-                      }));
-                      
-                      // Initialize empty annotations for each image first
-                      const initialAnnotations = imageData.map((img, idx) => ({
-                        imageId: idx,
-                        imageName: img.name,
-                        boxes: []
-                      }));
-                      
-                      setAnnotations(initialAnnotations);
-                      setAnnotationImages(imageData);
-                      setCurrentImageIndex(0);
-                      setSelectedBoxIndex(-1);
-                      
-                      console.log('✅ Loaded images:', imageData.length);
-                    } catch (error) {
-                      console.error('Error loading images:', error);
-                      alert('Error loading images: ' + error.message);
-                    }
-                  };
-                  input.click();
-                }}
-                disabled={loading}
-              >
-                <Text style={styles.uploadEmoji}>🖼️</Text>
-                <Text style={styles.uploadText}>
-                  {annotationImages.length === 0 ? 'Select Images' : `${annotationImages.length} Images Loaded`}
-                </Text>
-              </TouchableOpacity>
-
-              {annotationImages.length > 0 && (
-                <>
-                  {/* Image Navigation */}
-                  <View style={styles.imageNavigation}>
-                    <TouchableOpacity
-                      style={[styles.navBtn, currentImageIndex === 0 && styles.navBtnDisabled]}
-                      onPress={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
-                      disabled={currentImageIndex === 0}
-                    >
-                      <Text style={styles.navBtnText}>← Previous</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.imageCounter}>
-                      {currentImageIndex + 1} / {annotationImages.length}
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.navBtn, currentImageIndex === annotationImages.length - 1 && styles.navBtnDisabled]}
-                      onPress={() => setCurrentImageIndex(Math.min(annotationImages.length - 1, currentImageIndex + 1))}
-                      disabled={currentImageIndex === annotationImages.length - 1}
-                    >
-                      <Text style={styles.navBtnText}>Next →</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.annotationWorkspace}>
-                    {/* Canvas for drawing */}
-                    <View style={styles.canvasSection}>
-                      <Text style={styles.imageName}>{annotationImages[currentImageIndex]?.name}</Text>
-                      <Text style={{ color: '#fff', padding: 10, backgroundColor: '#333' }}>
-                        Debug: Images loaded: {annotationImages.length}, Current: {currentImageIndex + 1}
-                      </Text>
-                      {Platform.OS === 'web' && (
-                        <View
-                          ref={(el) => {
-                            if (el && !annotationCanvasRef.current && typeof document !== 'undefined') {
-                              try {
-                                const canvas = document.createElement('canvas');
-                                canvas.style.border = '2px solid #334155';
-                                canvas.style.borderRadius = '8px';
-                                canvas.style.maxWidth = '100%';
-                                canvas.style.cursor = isDrawingBox ? 'crosshair' : 'default';
-                                canvas.style.backgroundColor = '#1a1a1a';
-                                canvas.style.display = 'block';
-                                el.appendChild(canvas);
-                                annotationCanvasRef.current = canvas;
-                                console.log('✅ Canvas created and appended to DOM');
-                              } catch (error) {
-                                console.error('❌ Failed to create canvas:', error);
-                              }
-                            }
-                            if (el && annotationCanvasRef.current) {
-                              annotationCanvasRef.current.style.cursor = isDrawingBox ? 'crosshair' : 'default';
-                            }
-                          }}
-                          style={{ width: '100%', minHeight: 400, backgroundColor: '#0a0a0a' }}
-                        />
-                      )}
-                      <Text style={styles.canvasHint}>
-                        Click and drag to draw bounding boxes • Click on box to select/delete
-                      </Text>
-                    </View>
-
-                    {/* Label Selection Panel */}
-                    <View style={styles.labelPanel}>
-                      <Text style={styles.panelTitle}>Labels</Text>
-                      <View style={styles.labelGrid}>
-                        {customLabels.map((label, idx) => (
-                          <TouchableOpacity
-                            key={idx}
-                            style={[styles.labelChip, selectedLabel === label && styles.labelChipActive]}
-                            onPress={() => setSelectedLabel(label)}
-                          >
-                            <Text style={[styles.labelChipText, selectedLabel === label && styles.labelChipTextActive]}>
-                              {label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      
-                      {/* Add Custom Label */}
-                      <TouchableOpacity
-                        style={styles.addLabelBtn}
-                        onPress={() => setShowLabelInput(!showLabelInput)}
-                      >
-                        <Text style={styles.addLabelText}>+ Add Custom Label</Text>
-                      </TouchableOpacity>
-
-                      {showLabelInput && (
-                        <View style={styles.labelInputContainer}>
-                          <TextInput
-                            style={styles.labelInput}
-                            placeholder="Enter label name"
-                            value={newLabelText}
-                            onChangeText={setNewLabelText}
-                          />
-                          <TouchableOpacity
-                            style={styles.saveLabelBtn}
-                            onPress={() => {
-                              if (newLabelText.trim() && !customLabels.includes(newLabelText.trim())) {
-                                setCustomLabels([...customLabels, newLabelText.trim()]);
-                                setSelectedLabel(newLabelText.trim());
-                                setNewLabelText('');
-                                setShowLabelInput(false);
-                              }
-                            }}
-                          >
-                            <Text style={styles.saveLabelText}>Save</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-
-                      {/* Annotations List */}
-                      <Text style={styles.panelTitle}>Annotations ({annotations[currentImageIndex]?.boxes.length || 0})</Text>
-                      <ScrollView style={styles.annotationsList}>
-                        {annotations[currentImageIndex]?.boxes.map((box, idx) => (
-                          <View key={idx} style={[styles.annotationItem, selectedBoxIndex === idx && styles.annotationItemSelected]}>
-                            <TouchableOpacity 
-                              style={{ flex: 1 }}
-                              onPress={() => setSelectedBoxIndex(selectedBoxIndex === idx ? null : idx)}
-                            >
-                              <Text style={styles.annotationLabel}>
-                                {box.type === 'yolo' ? '🤖' : '✏️'} {box.label}
-                              </Text>
-                              <Text style={styles.annotationCoords}>
-                                x:{Math.round(box.x)} y:{Math.round(box.y)} w:{Math.round(box.width)} h:{Math.round(box.height)}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.deleteBoxBtn}
-                              onPress={() => {
-                                const updated = [...annotations];
-                                updated[currentImageIndex].boxes.splice(idx, 1);
-                                setAnnotations(updated);
-                                setSelectedBoxIndex(null);
-                              }}
-                            >
-                              <Text style={styles.deleteBoxText}>✕</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </ScrollView>
-
-                      {/* Export Button */}
-                      <TouchableOpacity
-                        style={styles.exportAnnotationsBtn}
-                        onPress={() => {
-                          const exportData = {
-                            version: '1.0',
-                            timestamp: new Date().toISOString(),
-                            images: annotations.map(img => ({
-                              imageName: img.imageName,
-                              imageId: img.imageId,
-                              annotations: img.boxes.map(box => ({
-                                label: box.label,
-                                type: box.type,
-                                bbox: {
-                                  x: box.x,
-                                  y: box.y,
-                                  width: box.width,
-                                  height: box.height
-                                }
-                              }))
-                            }))
-                          };
-                          
-                          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `annotations_${new Date().getTime()}.json`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                          showAlert('Success', 'Annotations exported to JSON');
-                        }}
-                        disabled={annotations.every(img => img.boxes.length === 0)}
-                      >
-                        <Text style={styles.exportAnnotationsText}>💾 Export JSON</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </>
               )}
             </>
           ) : analysisType === 'manual-digitizer' ? (
@@ -3960,6 +3871,24 @@ export default function App() {
                     </Text>
                   )}
                 </TouchableOpacity>
+
+                {/* Download Modified/Corrected Annotations Button */}
+                <TouchableOpacity
+                  style={[styles.downloadModifiedBtn, downloadingZip && styles.downloadAllBtnDisabled]}
+                  disabled={downloadingZip}
+                  onPress={downloadAllModified}
+                >
+                  {downloadingZip ? (
+                    <View style={styles.downloadAllBtnContent}>
+                      <ActivityIndicator color="#fff" size="small" style={styles.downloadSpinner} />
+                      <Text style={styles.downloadAllBtnText}>Creating ZIP...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.downloadAllBtnText}>
+                      ✏️ Download User-Modified Annotations (Images + JSONs)
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
 
               {/* Image Review Section */}
@@ -4054,14 +3983,9 @@ export default function App() {
                       <View style={styles.annotationActionsRow}>
                         <TouchableOpacity
                           style={[styles.annotationActionBtn, styles.editBtn]}
-                          onPress={() => {
-                            showAlert('Manual Editor', 
-                              'Manual annotation editor will be implemented here. ' +
-                              'You can add, delete, or modify bounding boxes.'
-                            );
-                          }}
+                          onPress={() => openAnnotationEditor(result, idx)}
                         >
-                          <Text style={styles.annotationActionBtnText}>✏️ Edit</Text>
+                          <Text style={styles.annotationActionBtnText}>✏️ Edit Boxes</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity
@@ -4086,6 +4010,51 @@ export default function App() {
                   )}
                 </View>
               ))}
+
+              {/* Browse All Images for Editing */}
+              <View style={styles.browseAllImagesSection}>
+                <Text style={styles.browseAllTitle}>📂 Browse All Images</Text>
+                <Text style={styles.browseAllSubtitle}>
+                  Select an image to edit its annotations
+                </Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={true}
+                  style={styles.imageScrollView}
+                >
+                  {results.data.yoloResults?.map((result, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[
+                        styles.imageThumbnailCard,
+                        result.annotations?.status === 'corrected' && styles.imageThumbnailCorrected
+                      ]}
+                      onPress={() => openAnnotationEditor(result, idx)}
+                    >
+                      <Image
+                        source={{ 
+                          uri: result.annotated_image 
+                            ? `${BACKEND_URL.replace('/api', '')}/${result.annotated_image}`
+                            : `${BACKEND_URL.replace('/api', '')}/uploads/${result.image}`
+                        }}
+                        style={styles.thumbnailImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.thumbnailOverlay}>
+                        <Text style={styles.thumbnailIndex}>#{idx + 1}</Text>
+                        <Text style={styles.thumbnailCount}>
+                          {result.annotations?.detection_count || 0} 📦
+                        </Text>
+                      </View>
+                      {result.annotations?.status === 'corrected' && (
+                        <View style={styles.correctedBadge}>
+                          <Text style={styles.correctedBadgeText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </>
           ) : results.type === 'dji-log' ? (
             <>
@@ -4323,6 +4292,396 @@ export default function App() {
           <Text style={styles.newAnalysisBtnText}>Start New Analysis</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ==================== ANNOTATION EDITOR MODAL ==================== */}
+      {annotationEditorVisible && editingImageData && (
+        <View style={styles.annotationEditorModal}>
+          {/* Header */}
+          <View style={styles.editorHeader}>
+            <TouchableOpacity 
+              style={styles.editorCloseBtn}
+              onPress={() => closeAnnotationEditor(false)}
+            >
+              <Text style={styles.editorCloseBtnText}>✕</Text>
+            </TouchableOpacity>
+            <View style={styles.editorTitleContainer}>
+              <Text style={styles.editorTitle}>Edit Annotations</Text>
+              <Text style={styles.editorSubtitle}>
+                Image {currentAnnotationIndex + 1} of {results?.data?.yoloResults?.length || 0}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.editorSaveBtn}
+              onPress={() => closeAnnotationEditor(true)}
+            >
+              <Text style={styles.editorSaveBtnText}>💾 Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Navigation */}
+          <View style={styles.editorNavigation}>
+            <TouchableOpacity 
+              style={styles.editorNavBtn}
+              onPress={() => navigateAnnotationEditor(-1)}
+            >
+              <Text style={styles.editorNavBtnText}>◀ Previous</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorImageName}>{editingImageData.image}</Text>
+            <TouchableOpacity 
+              style={styles.editorNavBtn}
+              onPress={() => navigateAnnotationEditor(1)}
+            >
+              <Text style={styles.editorNavBtnText}>Next ▶</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Main Content */}
+          <View style={styles.editorContent}>
+            {/* Image with Overlays */}
+            <View style={styles.editorImageContainer}>
+              {/* Image wrapper to maintain aspect ratio */}
+              <View 
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {/* Original Image */}
+                <Image
+                  source={{ 
+                    uri: `${BACKEND_URL.replace('/api', '')}/uploads/${editingImageData.originalImage || editingImageData.image}`
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                  }}
+                  resizeMode="contain"
+                />
+                
+                {/* SVG Overlay for Bounding Boxes - matches image with same aspect ratio handling */}
+                {Platform.OS === 'web' && (
+                  <svg
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: isDrawingNewBox ? 'all' : 'none',
+                      cursor: isDrawingNewBox ? 'crosshair' : 'default'
+                    }}
+                    viewBox={`0 0 ${editorImageDimensions.width} ${editorImageDimensions.height}`}
+                    preserveAspectRatio="xMidYMid meet"
+                    onMouseDown={(e) => {
+                      if (!isDrawingNewBox) return;
+                      const svg = e.currentTarget;
+                      const rect = svg.getBoundingClientRect();
+                      const point = svg.createSVGPoint();
+                      point.x = e.clientX;
+                      point.y = e.clientY;
+                      const ctm = svg.getScreenCTM().inverse();
+                      const svgPoint = point.matrixTransform(ctm);
+                      setNewBoxStart({ x: svgPoint.x, y: svgPoint.y });
+                      setNewBoxEnd({ x: svgPoint.x, y: svgPoint.y });
+                    }}
+                    onMouseMove={(e) => {
+                      if (!isDrawingNewBox || !newBoxStart) return;
+                      const svg = e.currentTarget;
+                      const point = svg.createSVGPoint();
+                      point.x = e.clientX;
+                      point.y = e.clientY;
+                      const ctm = svg.getScreenCTM().inverse();
+                      const svgPoint = point.matrixTransform(ctm);
+                      setNewBoxEnd({ x: svgPoint.x, y: svgPoint.y });
+                    }}
+                    onMouseUp={(e) => {
+                      if (!isDrawingNewBox || !newBoxStart || !newBoxEnd) return;
+                      const width = Math.abs(newBoxEnd.x - newBoxStart.x);
+                      const height = Math.abs(newBoxEnd.y - newBoxStart.y);
+                      // Only add if box is meaningful size (at least 20x20 pixels)
+                      if (width > 20 && height > 20) {
+                        addNewDetection({
+                          x1: newBoxStart.x,
+                          y1: newBoxStart.y,
+                          x2: newBoxEnd.x,
+                          y2: newBoxEnd.y
+                        }, newBoxLabel);
+                      }
+                      setNewBoxStart(null);
+                      setNewBoxEnd(null);
+                      setIsDrawingNewBox(false);
+                    }}
+                    onMouseLeave={() => {
+                      if (isDrawingNewBox) {
+                        setNewBoxStart(null);
+                        setNewBoxEnd(null);
+                      }
+                    }}
+                  >
+                  {editingAnnotations.map((det, idx) => {
+                    const x1 = det.bbox.x1;
+                    const y1 = det.bbox.y1;
+                    const boxWidth = det.bbox.width || (det.bbox.x2 - det.bbox.x1);
+                    const boxHeight = det.bbox.height || (det.bbox.y2 - det.bbox.y1);
+                    const isSelected = selectedDetection === idx;
+                    const strokeColor = isSelected ? '#00ff00' : (det.isManual ? '#ffff00' : '#ff0000');
+                    
+                    return (
+                      <g key={idx}>
+                        <rect
+                          x={x1}
+                          y={y1}
+                          width={boxWidth}
+                          height={boxHeight}
+                          fill="none"
+                          stroke={strokeColor}
+                          strokeWidth={isSelected ? 6 : 3}
+                          style={{ cursor: 'pointer', pointerEvents: 'all' }}
+                          onClick={() => setSelectedDetection(idx)}
+                        />
+                        {/* Label background */}
+                        <rect
+                          x={x1}
+                          y={y1 - 30}
+                          width={150}
+                          height={25}
+                          fill={strokeColor}
+                          opacity={0.8}
+                        />
+                        <text
+                          x={x1 + 5}
+                          y={y1 - 10}
+                          fill="#ffffff"
+                          fontSize="18"
+                          fontWeight="bold"
+                        >
+                          {det.class} ({Math.round(det.confidence * 100)}%)
+                        </text>
+                      </g>
+                    );
+                  })}
+                  
+                  {/* Preview box while drawing */}
+                  {isDrawingNewBox && newBoxStart && newBoxEnd && (
+                    <rect
+                      x={Math.min(newBoxStart.x, newBoxEnd.x)}
+                      y={Math.min(newBoxStart.y, newBoxEnd.y)}
+                      width={Math.abs(newBoxEnd.x - newBoxStart.x)}
+                      height={Math.abs(newBoxEnd.y - newBoxStart.y)}
+                      fill="rgba(39, 174, 96, 0.2)"
+                      stroke="#27ae60"
+                      strokeWidth={3}
+                      strokeDasharray="10,5"
+                    />
+                  )}
+                </svg>
+              )}
+              </View>
+            </View>
+
+            {/* Controls Panel */}
+            <View style={styles.editorControlsPanel}>
+              {/* Draw New Box Section */}
+              <View style={styles.drawNewBoxSection}>
+                <Text style={styles.drawNewBoxTitle}>➕ Add New Box</Text>
+                
+                {/* Label selector for new boxes */}
+                <Text style={styles.changeLabelTitle}>Select label first:</Text>
+                <View style={styles.labelButtonsContainer}>
+                  {availableLabels.slice(0, 6).map((label, idx) => (
+                    <TouchableOpacity
+                      key={label}
+                      style={[
+                        styles.labelButton,
+                        newBoxLabel === label && styles.labelButtonActive
+                      ]}
+                      onPress={() => setNewBoxLabel(label)}
+                    >
+                      <Text style={[
+                        styles.labelButtonText,
+                        newBoxLabel === label && styles.labelButtonTextActive
+                      ]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {/* Draw button */}
+                <TouchableOpacity
+                  style={[
+                    styles.drawBoxBtn,
+                    isDrawingNewBox && styles.drawBoxBtnActive
+                  ]}
+                  onPress={() => {
+                    setIsDrawingNewBox(!isDrawingNewBox);
+                    setSelectedDetection(null);
+                    if (!isDrawingNewBox) {
+                      setNewBoxStart(null);
+                      setNewBoxEnd(null);
+                    }
+                  }}
+                >
+                  <Text style={styles.drawBoxBtnText}>
+                    {isDrawingNewBox ? '❌ Cancel Drawing' : '✏️ Draw Box with "' + newBoxLabel + '"'}
+                  </Text>
+                </TouchableOpacity>
+                
+                {isDrawingNewBox && (
+                  <Text style={styles.drawingHint}>
+                    Click and drag on the image to draw a box
+                  </Text>
+                )}
+              </View>
+
+              {/* Detection Count */}
+              <View style={styles.editorStatsCard}>
+                <Text style={styles.editorStatsTitle}>Detections</Text>
+                <Text style={styles.editorStatsValue}>{editingAnnotations.length}</Text>
+              </View>
+
+              {/* Selected Box Info */}
+              {selectedDetection !== null && editingAnnotations[selectedDetection] && (
+                <View style={styles.selectedBoxInfo}>
+                  <Text style={styles.selectedBoxTitle}>Selected Box #{selectedDetection + 1}</Text>
+                  <Text style={styles.selectedBoxLabel}>
+                    Class: {editingAnnotations[selectedDetection].class}
+                  </Text>
+                  <Text style={styles.selectedBoxLabel}>
+                    Confidence: {Math.round(editingAnnotations[selectedDetection].confidence * 100)}%
+                  </Text>
+                  
+                  {/* Change Label */}
+                  <Text style={styles.changeLabelTitle}>Change Label:</Text>
+                  <View style={styles.labelButtonsContainer}>
+                    {availableLabels.map((label, idx) => (
+                      <TouchableOpacity
+                        key={label}
+                        style={[
+                          styles.labelButton,
+                          editingAnnotations[selectedDetection]?.class === label && styles.labelButtonActive
+                        ]}
+                        onPress={() => changeDetectionLabel(label, idx)}
+                      >
+                        <Text style={[
+                          styles.labelButtonText,
+                          editingAnnotations[selectedDetection]?.class === label && styles.labelButtonTextActive
+                        ]}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {/* Custom Label Input */}
+                  <Text style={styles.changeLabelTitle}>Or enter custom label:</Text>
+                  <View style={styles.customLabelContainer}>
+                    <TextInput
+                      style={styles.customLabelInput}
+                      placeholder="Enter custom label..."
+                      placeholderTextColor="#666"
+                      value={customLabelInput}
+                      onChangeText={setCustomLabelInput}
+                    />
+                    <TouchableOpacity
+                      style={[styles.customLabelBtn, !customLabelInput.trim() && styles.customLabelBtnDisabled]}
+                      onPress={() => {
+                        if (customLabelInput.trim()) {
+                          // Add to available labels if not already present
+                          if (!availableLabels.includes(customLabelInput.trim())) {
+                            setAvailableLabels(prev => [...prev, customLabelInput.trim()]);
+                          }
+                          changeDetectionLabel(customLabelInput.trim(), availableLabels.length);
+                          setCustomLabelInput('');
+                        }
+                      }}
+                      disabled={!customLabelInput.trim()}
+                    >
+                      <Text style={styles.customLabelBtnText}>Apply</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Delete Button */}
+                  <TouchableOpacity
+                    style={styles.deleteBoxBtn}
+                    onPress={deleteSelectedDetection}
+                  >
+                    <Text style={styles.deleteBoxBtnText}>🗑️ Delete Box</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Detection List */}
+              <View style={styles.editorDetectionList}>
+                <Text style={styles.editorDetectionListTitle}>All Detections:</Text>
+                <ScrollView style={styles.detectionListScroll}>
+                  {editingAnnotations.map((det, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[
+                        styles.editorDetectionItem,
+                        selectedDetection === idx && styles.editorDetectionItemSelected,
+                        det.isManual && styles.editorDetectionItemManual,
+                        det.isModified && styles.editorDetectionItemModified
+                      ]}
+                      onPress={() => setSelectedDetection(idx)}
+                    >
+                      <Text style={styles.editorDetectionIndex}>#{idx + 1}</Text>
+                      <Text style={styles.editorDetectionClass}>{det.class}</Text>
+                      <Text style={styles.editorDetectionConf}>
+                        {Math.round(det.confidence * 100)}%
+                      </Text>
+                      {det.isManual && <Text style={styles.manualBadge}>Manual</Text>}
+                      {det.isModified && !det.isManual && <Text style={styles.modifiedBadge}>Edited</Text>}
+                    </TouchableOpacity>
+                  ))}
+                  {editingAnnotations.length === 0 && (
+                    <Text style={styles.noDetectionsMsg}>No detections</Text>
+                  )}
+                </ScrollView>
+              </View>
+
+              {/* Export Buttons */}
+              <View style={styles.exportButtonsContainer}>
+                <Text style={styles.exportSectionTitle}>📥 Download Options</Text>
+                
+                <TouchableOpacity
+                  style={styles.editorExportBtn}
+                  onPress={exportAnnotatedImage}
+                  disabled={loading}
+                >
+                  <Text style={styles.editorExportBtnText}>🖼️ Download Image (with boxes)</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.editorExportBtn, styles.exportJsonBtn]}
+                  onPress={exportAnnotationJSON}
+                  disabled={loading}
+                >
+                  <Text style={styles.editorExportBtnText}>📄 Download JSON Annotations</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.editorExportBtn, styles.exportBothBtn]}
+                  onPress={exportBoth}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.editorExportBtnText}>📦 Download Both</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -4447,9 +4806,6 @@ const styles = StyleSheet.create({
   },
   cardDatasetJSON: {
     borderLeftColor: '#8B5CF6',
-  },
-  cardManualAnnotation: {
-    borderLeftColor: '#10b981',
   },
   cardDisabled: {
     opacity: 0.5,
@@ -5438,6 +5794,23 @@ const styles = StyleSheet.create({
     elevation: 4,
     minHeight: 56,
   },
+  downloadModifiedBtn: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    minHeight: 56,
+    marginTop: 12,
+  },
   downloadAllBtnDisabled: {
     backgroundColor: '#93C5FD',
     borderColor: '#BFDBFE',
@@ -6238,196 +6611,449 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     paddingHorizontal: 12,
   },
-  // Manual Annotation Tool Styles
-  imageNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginBottom: 16,
+  
+  // ==================== ANNOTATION EDITOR STYLES ====================
+  annotationEditorModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#1a1a2e',
+    zIndex: 1000,
   },
-  navBtn: {
-    backgroundColor: '#1a472a',
-    paddingHorizontal: 20,
+  editorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#16213e',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#0f3460',
+  },
+  editorCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editorCloseBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  editorTitleContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  editorTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  editorSubtitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  editorSaveBtn: {
+    backgroundColor: '#27ae60',
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
   },
-  navBtnDisabled: {
-    backgroundColor: '#ccc',
-    opacity: 0.5,
-  },
-  navBtnText: {
+  editorSaveBtnText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  imageCounter: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a472a',
-  },
-  annotationWorkspace: {
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 20,
-  },
-  canvasSection: {
-    flex: 2,
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-  },
-  imageName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
   },
-  canvasHint: {
-    fontSize: 11,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  labelPanel: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  panelTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a472a',
-    marginBottom: 12,
-  },
-  labelGrid: {
+  editorNavigation: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  labelChip: {
-    backgroundColor: '#e0e0e0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  labelChipActive: {
-    backgroundColor: '#1a472a',
-    borderColor: '#10b981',
-  },
-  labelChipText: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '500',
-  },
-  labelChipTextActive: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  addLabelBtn: {
-    backgroundColor: '#f0f9ff',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    borderStyle: 'dashed',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  addLabelText: {
-    color: '#3b82f6',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  labelInputContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  labelInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    paddingHorizontal: 10,
+    justifyContent: 'space-between',
+    backgroundColor: '#0f3460',
     paddingVertical: 8,
-    fontSize: 14,
+    paddingHorizontal: 16,
   },
-  saveLabelBtn: {
-    backgroundColor: '#10b981',
+  editorNavBtn: {
+    backgroundColor: '#1a472a',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
-    justifyContent: 'center',
   },
-  saveLabelText: {
+  editorNavBtnText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  annotationsList: {
-    maxHeight: 300,
-    marginBottom: 16,
+  editorImageName: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '500',
+    maxWidth: '50%',
+    textAlign: 'center',
   },
-  annotationItem: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+  editorContent: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  annotationItemSelected: {
-    borderColor: '#fbbf24',
-    backgroundColor: '#fffbeb',
-  },
-  annotationLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a472a',
-    marginBottom: 4,
-  },
-  annotationCoords: {
-    fontSize: 11,
-    color: '#666',
-    fontFamily: 'monospace',
-  },
-  deleteBoxBtn: {
-    backgroundColor: '#ef4444',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  editorImageContainer: {
+    flex: 2,
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
-  deleteBoxText: {
+  editorImage: {
+    width: '100%',
+    height: '100%',
+  },
+  editorControlsPanel: {
+    flex: 1,
+    backgroundColor: '#16213e',
+    padding: 16,
+    maxWidth: 320,
+    overflowY: 'auto',
+  },
+  drawNewBoxSection: {
+    backgroundColor: '#0f3460',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3498db',
+  },
+  drawNewBoxTitle: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 12,
   },
-  exportAnnotationsBtn: {
-    backgroundColor: '#8b5cf6',
-    padding: 14,
+  drawBoxBtn: {
+    backgroundColor: '#3498db',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 10,
   },
-  exportAnnotationsText: {
+  drawBoxBtnActive: {
+    backgroundColor: '#e74c3c',
+  },
+  drawBoxBtnText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
+  drawingHint: {
+    color: '#27ae60',
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  editorStatsCard: {
+    backgroundColor: '#0f3460',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  editorStatsTitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  editorStatsValue: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  selectedBoxInfo: {
+    backgroundColor: '#0f3460',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#27ae60',
+  },
+  selectedBoxTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  selectedBoxLabel: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  changeLabelTitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  labelButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  labelButton: {
+    backgroundColor: '#1a472a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2d8659',
+  },
+  labelButtonActive: {
+    backgroundColor: '#27ae60',
+    borderColor: '#27ae60',
+  },
+  labelButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  labelButtonTextActive: {
+    fontWeight: 'bold',
+  },
+  customLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  customLabelInput: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    borderWidth: 1,
+    borderColor: '#2d8659',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#fff',
+    fontSize: 13,
+  },
+  customLabelBtn: {
+    backgroundColor: '#27ae60',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  customLabelBtnDisabled: {
+    backgroundColor: '#555',
+    opacity: 0.6,
+  },
+  customLabelBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteBoxBtn: {
+    backgroundColor: '#e74c3c',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  deleteBoxBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  editorDetectionList: {
+    flex: 1,
+    backgroundColor: '#0f3460',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  editorDetectionListTitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  detectionListScroll: {
+    flex: 1,
+  },
+  editorDetectionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16213e',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  editorDetectionItemSelected: {
+    borderColor: '#27ae60',
+    backgroundColor: '#1a3a2e',
+  },
+  editorDetectionItemManual: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#f39c12',
+  },
+  editorDetectionItemModified: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#3498db',
+  },
+  editorDetectionIndex: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+    width: 30,
+  },
+  editorDetectionClass: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+  editorDetectionConf: {
+    color: '#27ae60',
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  manualBadge: {
+    backgroundColor: '#f39c12',
+    color: '#000',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  modifiedBadge: {
+    backgroundColor: '#3498db',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  noDetectionsMsg: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 20,
+  },
+  exportButtonsContainer: {
+    marginTop: 'auto',
+    paddingTop: 12,
+  },
+  exportSectionTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  editorExportBtn: {
+    backgroundColor: '#2d8659',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  exportJsonBtn: {
+    backgroundColor: '#3498db',
+  },
+  exportBothBtn: {
+    backgroundColor: '#9b59b6',
+  },
+  editorExportBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  
+  // Browse All Images Section
+  browseAllImagesSection: {
+    marginTop: 24,
+    paddingVertical: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  browseAllTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a472a',
+    marginBottom: 4,
+  },
+  browseAllSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 16,
+  },
+  imageScrollView: {
+    paddingVertical: 8,
+  },
+  imageThumbnailCard: {
+    width: 120,
+    height: 100,
+    marginRight: 12,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#e5e7eb',
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+  },
+  imageThumbnailCorrected: {
+    borderColor: '#27ae60',
+    borderWidth: 3,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  thumbnailIndex: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  thumbnailCount: {
+    color: '#fff',
+    fontSize: 11,
+  },
+  correctedBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#27ae60',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  correctedBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });
-

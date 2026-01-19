@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280171892-he0ufo.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171892-he0ufo.JPG",
+  "timestamp": "2025-12-09T11:47:17.801Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.434,
+      "bbox": {
+        "x1": 273.19683837890625,
+        "y1": 151.98043823242188,
+        "x2": 288.58258056640625,
+        "y2": 191.70327758789062,
+        "width": 15.3857421875,
+        "height": 39.72283935546875
+      },
+      "bbox_normalized": {
+        "x_center": 0.43889015913009644,
+        "y_center": 0.3356286287307739,
+        "width": 0.02404022216796875,
+        "height": 0.0775836706161499
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

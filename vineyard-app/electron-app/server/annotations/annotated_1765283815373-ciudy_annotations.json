@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765283815373-ciudy.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283815373-ciudy.JPG",
+  "timestamp": "2025-12-09T12:46:59.800Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.648,
+      "bbox": {
+        "x1": 1367.28271484375,
+        "y1": 1489.48486328125,
+        "x2": 1432.4827880859375,
+        "y2": 1669.0421142578125,
+        "width": 65.2000732421875,
+        "height": 179.5572509765625
+      },
+      "bbox_normalized": {
+        "x_center": 0.4666275978088379,
+        "y_center": 0.7018948793411255,
+        "width": 0.021733358502388,
+        "height": 0.0798032209277153
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

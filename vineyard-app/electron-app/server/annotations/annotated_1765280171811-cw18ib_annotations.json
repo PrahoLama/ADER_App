@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280171811-cw18ib.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280171811-cw18ib.JPG",
+  "timestamp": "2025-12-09T11:46:41.809Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "cell phone",
+      "class_id": 67,
+      "confidence": 0.402,
+      "bbox": {
+        "x1": 259.76678466796875,
+        "y1": 200.92236328125,
+        "x2": 447.84393310546875,
+        "y2": 299.21514892578125,
+        "width": 188.0771484375,
+        "height": 98.29278564453125
+      },
+      "bbox_normalized": {
+        "x_center": 0.5528208613395691,
+        "y_center": 0.48841553926467896,
+        "width": 0.2938705384731293,
+        "height": 0.1919780969619751
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

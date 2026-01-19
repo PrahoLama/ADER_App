@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADER Drone Analyzer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #2d3748;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+        }
+
+        .logo {
+            padding: 20px;
+            background: #1a202c;
+            text-align: center;
+            border-bottom: 2px solid #4a5568;
+        }
+
+        .logo-emoji {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+
+        .logo-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .logo-subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: #1a202c;
+            border-bottom: 1px solid #4a5568;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f56565;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #48bb78;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 12px;
+            flex: 1;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+        }
+
+        .nav-menu {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            margin: 4px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-item:hover {
+            background: #4a5568;
+        }
+
+        .nav-item.active {
+            background: #667eea;
+        }
+
+        .nav-item-emoji {
+            font-size: 24px;
+        }
+
+        .nav-item-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .content-area {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #f7fafc;
+        }
+
+        /* Home Screen */
+        .home-screen {
+            display: none;
+        }
+
+        .home-screen.active {
+            display: block;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border-color: #667eea;
+        }
+
+        .card-emoji {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .card-desc {
+            font-size: 14px;
+            color: #718096;
+            line-height: 1.5;
+        }
+
+        /* Analysis Screen */
+        .analysis-screen {
+            display: none;
+        }
+
+        .analysis-screen.active {
+            display: block;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .section-desc {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 16px;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f7fafc;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #edf2f7;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e6f2ff;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #2d3748;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .file-list {
+            margin-top: 16px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f7fafc;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .file-item img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .file-name {
+            flex: 1;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .remove-btn {
+            background: #f56565;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        /* Results Screen */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .result-card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .result-card-content {
+            padding: 12px;
+        }
+
+        .result-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .result-card-meta {
+            font-size: 12px;
+            color: #718096;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.visible {
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .loading-subtext {
+            font-size: 14px;
+            color: #718096;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 16px;
+            background: #e2e8f0;
+            border-radius: 8px;
+            height: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .progress-text {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2d3748;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+            z-index: 10000;
+        }
+
+        .toast.success {
+            background: #48bb78;
+        }
+
+        .toast.error {
+            background: #f56565;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Settings Section */
+        .settings-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+
+        .settings-label {
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 150px;
+        }
+
+        .settings-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        select.settings-input {
+            cursor: pointer;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .back-btn:hover {
+            color: #5a67d8;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state-emoji {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-desc {
+            font-size: 14px;
+        }
+
+        /* Modern Button Styles */
+        .btn-primary {
+            background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(46, 125, 50, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #388e3c 0%, #43a047 100%);
+            box-shadow: 0 6px 20px rgba(46, 125, 50, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(46, 125, 50, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: linear-gradient(135deg, #bdbdbd 0%, #9e9e9e 100%);
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.6;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #757575 0%, #616161 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #616161 0%, #424242 100%);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 28px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #2e7d32;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Industry Buttons */
+        .industry-btn {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .industry-btn:hover {
+            border-color: #2e7d32;
+            background: #f1f8f4;
+        }
+
+        .industry-btn.active {
+            border-color: #2e7d32;
+            background: #2e7d32;
+            color: white;
+        }
+
+        /* Files List */
+        .files-list {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .file-name {
+            flex: 1;
+            font-size: 14px;
+            color: #2d3748;
+            margin-left: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: #718096;
+            margin: 0 12px;
+        }
+
+        .remove-file-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .remove-file-btn:hover {
+            background: #c82333;
+        }
+
+        /* Manual Annotation Editor Styles */
+        .editor-tool-btn {
+            padding: 10px 18px;
+            border: 2px solid #d1d5db;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .editor-tool-btn:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .editor-tool-btn.active {
+            border-color: #22c55e;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+        }
+
+        .detection-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .detection-item:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+
+        .detection-item.selected {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+        }
+
+        .detection-item.manual {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .detection-item .detection-index {
+            width: 28px;
+            height: 28px;
+            background: #e5e7eb;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            color: #374151;
+            margin-right: 12px;
+        }
+
+        .detection-item.selected .detection-index {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .detection-item .detection-class {
+            font-weight: 600;
+            color: #1f2937;
+            flex: 1;
+        }
+
+        .detection-item .detection-confidence {
+            font-size: 13px;
+            color: #6b7280;
+            margin-right: 12px;
+        }
+
+        .detection-item .detection-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .detection-item .detection-badge.manual {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .detection-item .detection-badge.edited {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .label-btn {
+            padding: 8px 14px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .label-btn:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .label-btn.active {
+            border-color: #3b82f6;
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Navigation Arrow Buttons */
+        .nav-arrow-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            min-width: 100px;
+        }
+
+        .nav-arrow-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-arrow-btn:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+            opacity: 0.5;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .nav-arrow-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-emoji">🍇</div>
+                <div class="logo-title">ADER Analyzer</div>
+                <div class="logo-subtitle">Drone Data Processing</div>
+            </div>
+
+            <div class="status-badge">
+                <div class="status-dot" id="statusDot"></div>
+                <div class="status-text" id="statusText">Checking...</div>
+                <button class="refresh-btn" onclick="checkBackendHealth()">🔄</button>
+            </div>
+
+            <div class="nav-menu">
+                <div class="nav-item active" onclick="showScreen('home')">
+                    <span class="nav-item-emoji">🏠</span>
+                    <span class="nav-item-text">Home</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('drone')">
+                    <span class="nav-item-emoji">📷</span>
+                    <span class="nav-item-text">Drone Analysis</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('orthophoto-gaps')">
+                    <span class="nav-item-emoji">🔍</span>
+                    <span class="nav-item-text">Gap Detection</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('orthomosaic')">
+                    <span class="nav-item-emoji">🌍</span>
+                    <span class="nav-item-text">Generate Orthomosaic</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('annotation')">
+                    <span class="nav-item-emoji">🏷️</span>
+                    <span class="nav-item-text">Image Annotation</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('manual-editor')">
+                    <span class="nav-item-emoji">✏️</span>
+                    <span class="nav-item-text">Manual Editor</span>
+                </div>
+                <div class="nav-item" onclick="showScreen('digitizer')">
+                    <span class="nav-item-emoji">📍</span>
+                    <span class="nav-item-text">Row Digitizer</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <div class="header-title" id="headerTitle">ADER Drone Analyzer</div>
+                <div class="header-subtitle" id="headerSubtitle">Select an analysis mode to get started</div>
+            </div>
+
+            <div class="content-area" id="contentArea">
+                <!-- Home Screen -->
+                <div class="home-screen active" id="screen-home">
+                    <div class="cards-grid">
+                        <div class="card" onclick="showScreen('drone')">
+                            <div class="card-emoji">📷</div>
+                            <div class="card-title">Drone Analysis</div>
+                            <div class="card-desc">Analyze drone RGB images to detect vegetation health using VARI, ExG, and ExGR indices</div>
+                        </div>
+
+                        <div class="card" onclick="showScreen('orthophoto-gaps')">
+                            <div class="card-emoji">🔍</div>
+                            <div class="card-title">Gap Detection</div>
+                            <div class="card-desc">Detect gaps in vineyard rows using orthophoto imagery and clustering algorithms</div>
+                        </div>
+
+                        <div class="card" onclick="showScreen('orthomosaic')">
+                            <div class="card-emoji">🌍</div>
+                            <div class="card-title">Generate Orthomosaic</div>
+                            <div class="card-desc">Create georeferenced orthomosaics from drone imagery using NodeODM</div>
+                        </div>
+
+                        <div class="card" onclick="showScreen('annotation')">
+                            <div class="card-emoji">🏷️</div>
+                            <div class="card-title">Image Annotation</div>
+                            <div class="card-desc">Annotate images with DJI flight metadata and YOLO object detection</div>
+                        </div>
+
+                        <div class="card" onclick="showScreen('manual-editor')">
+                            <div class="card-emoji">✏️</div>
+                            <div class="card-title">Manual Annotation Editor</div>
+                            <div class="card-desc">Draw, edit, and delete bounding boxes manually on images with label management</div>
+                        </div>
+
+                        <div class="card" onclick="showScreen('digitizer')">
+                            <div class="card-emoji">📍</div>
+                            <div class="card-title">Manual Row Digitizer</div>
+                            <div class="card-desc">Manually draw vineyard rows on orthophotos and export to GeoJSON</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drone Analysis Screen -->
+                <div class="analysis-screen" id="screen-drone">
+                    <div class="back-btn" onclick="showScreen('home')">← Back to Home</div>
+
+                    <div class="section">
+                        <div class="section-title">Upload Drone Images</div>
+                        <div class="section-desc">Select RGB drone images (.jpg, .jpeg, .png) for vegetation health analysis</div>
+                        
+                        <div class="upload-area" id="droneUploadArea" onclick="document.getElementById('droneImageInput').click()">
+                            <div class="upload-icon">📁</div>
+                            <div>Drop images here or click to select</div>
+                        </div>
+                        <input type="file" id="droneImageInput" accept=".jpg,.jpeg,.png" multiple>
+
+                        <div class="file-list" id="droneImageList"></div>
+                    </div>
+
+                    <div class="section">
+                        <button class="btn btn-primary" id="analyzeDroneBtn" onclick="analyzeDroneImages()" disabled>
+                            🔬 Analyze Images
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearDroneImages()" style="margin-left: 10px;">
+                            🗑️ Clear All
+                        </button>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="droneResults"></div>
+                </div>
+
+                <!-- Gap Detection Screen -->
+                <div class="analysis-screen" id="screen-orthophoto-gaps">
+                    <div class="back-btn" onclick="showScreen('home')">← Back to Home</div>
+
+                    <div class="section">
+                        <div class="section-title">Upload Orthophoto</div>
+                        <div class="section-desc">Select an orthophoto image (.tif, .tiff) for gap detection</div>
+                        
+                        <div class="upload-area" onclick="document.getElementById('orthophotoInput').click()">
+                            <div class="upload-icon">🗺️</div>
+                            <div>Drop orthophoto here or click to select</div>
+                        </div>
+                        <input type="file" id="orthophotoInput" accept=".tif,.tiff">
+
+                        <div class="file-list" id="orthophotoList"></div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">Upload Rows GeoJSON (Optional)</div>
+                        <div class="section-desc">Upload a GeoJSON file with vineyard row geometries</div>
+                        
+                        <button class="btn btn-secondary" onclick="document.getElementById('geojsonInput').click()">
+                            📍 Select GeoJSON File
+                        </button>
+                        <input type="file" id="geojsonInput" accept=".geojson,.json">
+
+                        <div class="file-list" id="geojsonList"></div>
+                    </div>
+
+                    <div class="section">
+                        <div class="settings-row">
+                            <div class="settings-label">Clustering Method:</div>
+                            <select class="settings-input" id="clusteringMethod">
+                                <option value="kmeans">K-means (Recommended)</option>
+                                <option value="dbscan">DBSCAN</option>
+                                <option value="slic">SLIC Superpixels</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-primary" id="analyzeGapsBtn" onclick="analyzeGaps()" disabled>
+                            🔍 Detect Gaps
+                        </button>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="gapResults"></div>
+                </div>
+
+                <!-- Orthomosaic Generation Screen -->
+                <div class="analysis-screen" id="screen-orthomosaic">
+                    <div class="back-btn" onclick="showScreen('home')">← Back to Home</div>
+
+                    <div class="section">
+                        <div class="section-title">Create New Orthomosaic Project</div>
+                        <div class="section-desc">Upload drone images to generate a georeferenced orthomosaic</div>
+
+                        <div class="settings-row">
+                            <div class="settings-label">Project Name:</div>
+                            <input type="text" class="settings-input" id="projectName" placeholder="my-vineyard-2026">
+                        </div>
+
+                        <div class="settings-row">
+                            <div class="settings-label">Quality:</div>
+                            <select class="settings-input" id="orthomosaicQuality">
+                                <option value="low">Low (Fast)</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High (Slow)</option>
+                                <option value="ultra">Ultra (Very Slow)</option>
+                            </select>
+                        </div>
+
+                        <div class="settings-row">
+                            <div class="settings-label">Feature Quality:</div>
+                            <select class="settings-input" id="featureQuality">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high" selected>High</option>
+                                <option value="ultra">Ultra</option>
+                            </select>
+                        </div>
+
+                        <div class="upload-area" onclick="document.getElementById('orthomosaicImagesInput').click()">
+                            <div class="upload-icon">📸</div>
+                            <div>Drop drone images here or click to select</div>
+                            <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">Upload multiple images with GPS metadata</div>
+                        </div>
+                        <input type="file" id="orthomosaicImagesInput" accept=".jpg,.jpeg,.png,.tif,.tiff" multiple>
+
+                        <div class="file-list" id="orthomosaicImageList"></div>
+                    </div>
+
+                    <div class="section">
+                        <button class="btn btn-primary" id="generateOrthomosaicBtn" onclick="generateOrthomosaic()" disabled>
+                            🌍 Generate Orthomosaic
+                        </button>
+                    </div>
+
+                    <!-- Results after generation -->
+                    <div id="orthomosaicResults"></div>
+
+                    <!-- Projects List -->
+                    <div id="orthomosaicProjects"></div>
+                </div>
+
+                <!-- Image Annotation Screen -->
+                <div class="analysis-screen" id="screen-annotation">
+                    <div class="section">
+                        <h2 style="margin: 0 0 8px 0; color: #1a472a;">🏷️ Image Annotation</h2>
+                        <p style="color: #666; margin: 0;">Add DJI flight metadata to images + optional YOLO auto-annotation</p>
+                    </div>
+
+                    <!-- Step 1: DJI Log Files -->
+                    <div class="section">
+                        <h3 style="margin: 0 0 8px 0;">Step 1: Select DJI Log File(s)</h3>
+                        <p style="color: #666; font-size: 14px; margin: 0;">Upload DJI flight log(s) (.txt) - Supports up to 50 log files</p>
+                    </div>
+
+                    <div class="upload-area" onclick="document.getElementById('annotation-log-input').click()">
+                        <div class="upload-icon">📄</div>
+                        <div class="upload-text" id="annotation-log-text">Select Log Files (up to 50)</div>
+                    </div>
+                    <input type="file" id="annotation-log-input" multiple accept=".txt,.dat,.log" style="display: none;" />
+
+                    <div id="annotation-logs-list" class="files-list" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong id="annotation-logs-count">0 Log Files</strong>
+                            <button class="btn-secondary" onclick="clearAnnotationLogs()" style="padding: 6px 12px; font-size: 13px;">🗑️ Clear All</button>
+                        </div>
+                        <div id="annotation-logs-items"></div>
+                    </div>
+
+                    <!-- Step 2: Images -->
+                    <div class="section">
+                        <h3 style="margin: 0 0 8px 0;">Step 2: Select Images to Annotate</h3>
+                        <p style="color: #666; font-size: 14px; margin: 0;">Upload drone images (.tif, .jpg, .png) - Supports up to 1000 images for batch processing</p>
+                    </div>
+
+                    <div class="upload-area" onclick="document.getElementById('annotation-images-input').click()" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                        <div class="upload-icon">🖼️</div>
+                        <div class="upload-text" id="annotation-images-text">Select Images</div>
+                    </div>
+                    <input type="file" id="annotation-images-input" multiple accept="image/*,.tif,.tiff" style="display: none;" />
+
+                    <div id="annotation-images-list" class="files-list" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong id="annotation-images-count">0 Images</strong>
+                            <button class="btn-secondary" onclick="clearAnnotationImages()" style="padding: 6px 12px; font-size: 13px;">🗑️ Clear All</button>
+                        </div>
+                        <div id="annotation-images-items"></div>
+                    </div>
+
+                    <!-- Step 3: YOLO Auto-Annotation -->
+                    <div class="section">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 style="margin: 0 0 8px 0;">🤖 YOLO Auto-Annotation (Optional)</h3>
+                                <p style="color: #666; font-size: 14px; margin: 0;">Automatically detect objects (vines, fruits, people, vehicles, etc.) with bounding boxes</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="enable-yolo" onchange="toggleYoloSettings()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="yolo-settings" style="display: none;">
+                        <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 2px solid #2196f3;">
+                            <div style="margin-bottom: 15px;">
+                                <strong style="display: block; margin-bottom: 8px; font-size: 14px;">Industry Mode:</strong>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    <button class="industry-btn active" data-mode="agriculture" onclick="selectIndustry('agriculture')">
+                                        🌾 Agriculture
+                                    </button>
+                                    <button class="industry-btn" data-mode="rescue" onclick="selectIndustry('rescue')">
+                                        🚁 Rescue
+                                    </button>
+                                    <button class="industry-btn" data-mode="general" onclick="selectIndustry('general')">
+                                        🔍 General
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 15px;">
+                                <strong style="display: block; margin-bottom: 8px; font-size: 14px;">Confidence Threshold: <span id="confidence-value">0.50</span></strong>
+                                <input type="range" id="confidence-slider" min="0.1" max="0.9" step="0.01" value="0.50" 
+                                    oninput="document.getElementById('confidence-value').textContent = parseFloat(this.value).toFixed(2)"
+                                    style="width: 100%; height: 6px; border-radius: 5px; background: #d3d3d3; outline: none; -webkit-appearance: none;">
+                            </div>
+
+                            <div style="background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; font-size: 13px;">
+                                <strong style="display: block; margin-bottom: 8px;">ℹ️ Model Information:</strong>
+                                <div style="line-height: 1.8;">
+                                    <strong>🌾 Agriculture:</strong> Detects vines, fruits, trees, gaps, diseases<br>
+                                    <strong>🚁 Rescue:</strong> Detects people, vehicles, animals, structures<br>
+                                    <strong>🔍 General:</strong> Detects all COCO classes (80+ objects)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Info Box -->
+                    <div style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); padding: 16px; border-radius: 10px; border-left: 4px solid #ffc107; margin: 20px 0;">
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <div style="font-size: 24px;">💡</div>
+                            <div style="flex: 1; color: #856404; line-height: 1.6;">
+                                Images will be matched with flight data based on timestamps, then optionally auto-annotated with YOLO for object detection. You can manually correct detections afterward.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Process Button -->
+                    <button class="btn-primary" id="annotation-process-btn" onclick="processAnnotation()" disabled>
+                        ⚡ Annotate Images
+                    </button>
+
+                    <!-- Progress Section -->
+                    <div id="annotation-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="annotation-progress-fill"></div>
+                        </div>
+                        <div id="annotation-progress-text" style="text-align: center; margin-top: 10px; color: #666; font-size: 14px;"></div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="annotation-results" style="display: none;"></div>
+                </div>
+
+                <!-- Manual Annotation Editor Screen -->
+                <div class="analysis-screen" id="screen-manual-editor">
+                    <div class="section">
+                        <h2 style="margin: 0 0 8px 0; color: #1a472a;">✏️ Manual Annotation Editor</h2>
+                        <p style="color: #666; margin: 0;">Draw, edit, and delete bounding boxes on images. Create training datasets for YOLO.</p>
+                    </div>
+
+                    <!-- Image Source Selection -->
+                    <div class="section">
+                        <h3 style="margin: 0 0 12px 0;">📁 Load Image</h3>
+                        <p style="color: #666; font-size: 14px; margin: 0 0 16px 0;">Upload an image to annotate manually or load from previous annotation results</p>
+                        
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+                            <button class="btn-secondary" onclick="document.getElementById('editor-image-input').click()" style="flex: 1; min-width: 200px;">
+                                🖼️ Upload New Image
+                            </button>
+                            <button class="btn-secondary" id="loadFromAnnotationBtn" onclick="loadFromAnnotationResults()" style="flex: 1; min-width: 200px;" disabled>
+                                📋 Load from YOLO Results
+                            </button>
+                        </div>
+                        <input type="file" id="editor-image-input" accept="image/*,.tif,.tiff" style="display: none;" onchange="loadEditorImage(event)">
+                        
+                        <div id="editor-current-image" style="display: none; margin-top: 12px; padding: 12px; background: #f0fdf4; border-radius: 8px; border: 2px solid #10b981;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 20px;">✅</span>
+                                <span id="editor-image-name" style="font-weight: 600; color: #166534;"></span>
+                                <span id="editor-image-size" style="font-size: 12px; color: #4b5563; margin-left: auto;"></span>
+                            </div>
+                        </div>
+
+                        <!-- Navigation Bar for YOLO Images -->
+                        <div id="editor-navigation-bar" style="display: none; margin-top: 16px; padding: 16px; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); border-radius: 12px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                                <!-- Previous Button -->
+                                <button id="prevImageBtn" onclick="navigateImage(-1)" class="nav-arrow-btn" title="Previous Image (←)">
+                                    <span style="font-size: 24px;">◀</span>
+                                    <span style="font-size: 12px;">Previous</span>
+                                </button>
+                                
+                                <!-- Image Counter -->
+                                <div style="text-align: center; flex: 1;">
+                                    <div style="color: white; font-size: 14px; opacity: 0.8;">Image</div>
+                                    <div style="color: white; font-size: 28px; font-weight: 700;">
+                                        <span id="currentImageNum">1</span> / <span id="totalImageNum">1</span>
+                                    </div>
+                                    <div id="navImageName" style="color: #93c5fd; font-size: 12px; margin-top: 4px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+                                </div>
+                                
+                                <!-- Next Button -->
+                                <button id="nextImageBtn" onclick="navigateImage(1)" class="nav-arrow-btn" title="Next Image (→)">
+                                    <span style="font-size: 24px;">▶</span>
+                                    <span style="font-size: 12px;">Next</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Auto-save indicator and keyboard hints -->
+                            <div style="text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.2);">
+                                <span id="autoSaveIndicator" style="color: #86efac; font-size: 12px;">💾 Changes auto-saved when navigating</span>
+                                <div style="color: rgba(255,255,255,0.5); font-size: 10px; margin-top: 10px; letter-spacing: 0.5px;">
+                                    ⌨️ ← → Navigate  |  D Draw  |  Del Delete  |  +/- Zoom  |  0 Reset  |  Esc Cancel
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editor Canvas Area -->
+                    <div id="editor-canvas-container" style="display: none;">
+                        <div class="section" style="padding: 16px;">
+                            <!-- Toolbar -->
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+                                <!-- Draw Mode Toggle -->
+                                <button class="editor-tool-btn" id="drawModeBtn" onclick="toggleDrawMode()">
+                                    ✏️ Draw Box
+                                </button>
+                                
+                                <!-- Zoom Controls -->
+                                <div style="display: flex; align-items: center; gap: 4px; background: #f3f4f6; padding: 4px 8px; border-radius: 8px;">
+                                    <button class="editor-tool-btn" onclick="zoomEditor(-1)" title="Zoom Out (-)" style="padding: 6px 10px; font-size: 16px;">➖</button>
+                                    <span id="zoom-level-display" style="min-width: 50px; text-align: center; font-weight: 600; color: #374151;">100%</span>
+                                    <button class="editor-tool-btn" onclick="zoomEditor(1)" title="Zoom In (+)" style="padding: 6px 10px; font-size: 16px;">➕</button>
+                                    <button class="editor-tool-btn" onclick="resetZoom()" title="Reset Zoom (0)" style="padding: 6px 10px; font-size: 12px;">🔄</button>
+                                </div>
+                                
+                                <!-- Label Selector -->
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <label style="font-size: 14px; font-weight: 600; color: #374151;">Label:</label>
+                                    <select id="editor-label-select" class="settings-input" style="width: auto; min-width: 120px;">
+                                        <option value="vine">vine</option>
+                                        <option value="grape">grape</option>
+                                        <option value="diseased">diseased</option>
+                                        <option value="healthy">healthy</option>
+                                        <option value="missing">missing</option>
+                                        <option value="person">person</option>
+                                        <option value="car">car</option>
+                                        <option value="other">other</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Custom Label -->
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="text" id="editor-custom-label" class="settings-input" placeholder="Custom label" style="width: 120px;">
+                                    <button class="btn-secondary" onclick="addCustomLabel()" style="padding: 8px 12px;">Add</button>
+                                </div>
+                                
+                                <div style="flex: 1;"></div>
+                                
+                                <!-- Detection Counter -->
+                                <div style="background: #f3f4f6; padding: 8px 16px; border-radius: 8px;">
+                                    <span style="font-weight: 600; color: #1f2937;">Boxes: </span>
+                                    <span id="editor-box-count" style="font-weight: 700; color: #2563eb;">0</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Mode Indicator -->
+                            <div id="editor-mode-indicator" style="display: none; margin-bottom: 16px; padding: 12px; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 8px; border: 2px solid #22c55e;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 10px; height: 10px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite;"></div>
+                                    <span style="font-weight: 600; color: #166534;">Drawing Mode Active</span>
+                                    <span style="font-size: 13px; color: #4ade80; margin-left: auto;">Click and drag on the image to draw a box</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Canvas Container -->
+                            <div id="editor-canvas-wrapper" style="position: relative; background: #1e293b; border-radius: 12px; overflow: auto; min-height: 500px; max-height: 75vh;">
+                                <!-- Zoomable container for image + SVG -->
+                                <div id="editor-zoom-container" style="display: inline-block; position: relative; transform-origin: center center; transition: transform 0.15s ease;">
+                                    <!-- Image -->
+                                    <img id="editor-image" style="display: block; max-width: none; cursor: default;" draggable="false">
+                                    
+                                    <!-- SVG overlay for bounding boxes (handles all interactions) -->
+                                    <svg id="editor-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"></svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Selected Box Controls -->
+                        <div id="selected-box-panel" class="section" style="display: none; margin-top: 16px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6;">
+                            <h4 style="margin: 0 0 16px 0; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                                <span>🎯</span>
+                                Selected Box #<span id="selected-box-number">1</span>
+                            </h4>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div>
+                                    <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 4px;">Current Label</label>
+                                    <div id="selected-box-label" style="font-size: 18px; font-weight: 700; color: #1e40af;">vine</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 4px;">Confidence</label>
+                                    <div id="selected-box-confidence" style="font-size: 18px; font-weight: 700; color: #1e40af;">100%</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 4px;">Type</label>
+                                    <div id="selected-box-type" style="font-size: 14px; font-weight: 600; color: #1e40af;">Manual</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Change Label -->
+                            <div style="margin-bottom: 16px;">
+                                <label style="font-size: 14px; font-weight: 600; color: #374151; display: block; margin-bottom: 8px;">Change Label:</label>
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;" id="label-buttons-container"></div>
+                            </div>
+                            
+                            <!-- Delete Button -->
+                            <button class="btn-danger" onclick="deleteSelectedBox()" style="width: 100%;">
+                                🗑️ Delete Selected Box
+                            </button>
+                        </div>
+                        
+                        <!-- Detection List -->
+                        <div class="section" style="margin-top: 16px;">
+                            <h4 style="margin: 0 0 12px 0; color: #1a472a;">📋 All Detections</h4>
+                            <div id="editor-detection-list" style="max-height: 300px; overflow-y: auto;">
+                                <div style="text-align: center; padding: 30px; color: #9ca3af;">
+                                    <span style="font-size: 40px; display: block; margin-bottom: 12px;">📦</span>
+                                    <span>No bounding boxes yet. Draw some boxes on the image!</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Export Section -->
+                        <div class="section" style="margin-top: 16px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b;">
+                            <h4 style="margin: 0 0 16px 0; color: #92400e; display: flex; align-items: center; gap: 8px;">
+                                <span>📥</span>
+                                Export Annotations
+                            </h4>
+                            
+                            <!-- Export Current Image -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="font-size: 13px; font-weight: 600; color: #92400e; margin-bottom: 8px;">Current Image:</div>
+                                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                    <button class="btn-primary" onclick="exportAnnotatedPNG()" style="flex: 1; min-width: 150px;">
+                                        🖼️ Export PNG
+                                    </button>
+                                    <button class="btn-primary" onclick="exportAnnotationJSONFile()" style="flex: 1; min-width: 150px;">
+                                        📄 Export JSON
+                                    </button>
+                                    <button class="btn-primary" onclick="exportYOLOFormat()" style="flex: 1; min-width: 150px;">
+                                        🎯 Export YOLO
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Export All Images -->
+                            <div id="export-all-section" style="display: none; padding-top: 16px; border-top: 2px dashed #f59e0b;">
+                                <div style="font-size: 13px; font-weight: 600; color: #92400e; margin-bottom: 8px;">All Images (<span id="export-all-count">0</span>):</div>
+                                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                    <button class="btn-primary" onclick="exportAllAnnotatedPNGs()" style="flex: 1; min-width: 150px; background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                                        📦 Export All PNGs
+                                    </button>
+                                    <button class="btn-primary" onclick="exportAllAnnotationsJSON()" style="flex: 1; min-width: 150px; background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                                        📦 Export All JSON
+                                    </button>
+                                    <button class="btn-primary" onclick="exportAllYOLOFormat()" style="flex: 1; min-width: 150px; background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                                        📦 Export All YOLO
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manual Row Digitizer Screen -->
+                <div class="analysis-screen" id="screen-digitizer">
+                    <div class="section">
+                        <h2 style="margin: 0 0 8px 0; color: #1a472a;">📍 Manual Row Digitizer</h2>
+                        <p style="color: #666; margin: 0;">Draw vineyard rows on orthophoto and export to GeoJSON</p>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">Step 1: Load Orthophoto</div>
+                        <div class="section-desc">Upload georeferenced TIFF/PNG/JPG of your vineyard</div>
+                        
+                        <div class="upload-area" onclick="document.getElementById('digitizerOrthophotoInput').click()">
+                            <div class="upload-icon">🗺️</div>
+                            <div id="digitizerFileName">Drop orthophoto here or click to select</div>
+                            <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">Supports GeoTIFF (.tif), PNG, JPEG</div>
+                        </div>
+                        <input type="file" id="digitizerOrthophotoInput" accept=".tif,.tiff,.png,.jpg,.jpeg" onchange="loadDigitizerOrthophoto(event)">
+                    </div>
+
+                    <!-- Geobounds Info -->
+                    <div id="geoBoundsInfo" style="display: none; margin: 16px 0; padding: 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; color: white;">
+                        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                            <span style="font-size: 24px; margin-right: 8px;">🌍</span>
+                            <div style="font-weight: 600; font-size: 16px;">Georeferenced</div>
+                            <div style="margin-left: auto; background: rgba(255,255,255,0.3); padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">ACTIVE</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; font-family: monospace;" id="geoBoundsValues"></div>
+                        </div>
+                    </div>
+
+                    <!-- Warning for non-georeferenced -->
+                    <div id="noGeoBoundsWarning" style="display: none; margin: 16px 0; padding: 14px; background: #fef3c7; border-left: 4px solid #fbbf24; border-radius: 8px;">
+                        <div style="display: flex; align-items: center; color: #92400e;">
+                            <span style="font-size: 20px; margin-right: 8px;">⚠️</span>
+                            <div>
+                                <div style="font-weight: 600; font-size: 14px;">No Georeferencing</div>
+                                <div style="font-size: 12px; margin-top: 4px; opacity: 0.8;">Pixel coordinates only - may not match QGIS</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Drawing Area -->
+                    <div id="digitizerCanvasContainer" style="display: none;">
+                        <div class="section">
+                            <div class="section-title">Step 2: Draw Vineyard Rows</div>
+                            <div class="section-desc">Click to add points, double-click to finish each row</div>
+                        </div>
+
+                        <!-- Drawing Controls -->
+                        <div style="margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" id="startDrawingBtn" onclick="toggleDrawing()">
+                                ✏️ Draw New Row
+                            </button>
+                            <button class="btn btn-secondary" onclick="undoLastPoint()" id="undoBtn" disabled>
+                                ↶ Undo Point
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearCurrentRow()" id="clearRowBtn" disabled>
+                                ✕ Clear Row
+                            </button>
+                            <button class="btn btn-secondary" onclick="deleteLastRow()" id="deleteRowBtn" disabled>
+                                🗑️ Delete Last Row
+                            </button>
+                            <button class="btn btn-primary" onclick="exportRowsGeoJSON()" id="exportBtn" disabled>
+                                📥 Export GeoJSON
+                            </button>
+                        </div>
+
+                        <!-- Rows Counter -->
+                        <div id="rowsCounter" style="margin: 12px 0; padding: 12px; background: #f0fdf4; border-radius: 8px; display: none;">
+                            <span style="font-weight: 600; color: #166534;">Rows drawn: </span>
+                            <span id="rowsCount" style="color: #166534; font-weight: 700;">0</span>
+                        </div>
+
+                        <!-- Canvas with Controls Overlay -->
+                        <div style="position: relative; margin: 16px 0; background: #1e293b; border-radius: 12px; overflow: hidden;">
+                            <!-- Zoom Controls -->
+                            <div style="position: absolute; top: 16px; right: 16px; z-index: 10; background: rgba(30, 41, 59, 0.95); border-radius: 8px; padding: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                                <button onclick="zoomIn()" style="display: block; width: 40px; height: 40px; background: #3b82f6; border: none; border-radius: 6px; color: white; font-size: 20px; cursor: pointer; margin-bottom: 4px;">+</button>
+                                <div style="text-align: center; padding: 8px 0; color: #94a3b8; font-size: 10px;">
+                                    <div>ZOOM</div>
+                                    <div id="zoomLevel" style="color: white; font-weight: 700; font-size: 14px; margin-top: 2px;">100%</div>
+                                </div>
+                                <button onclick="zoomOut()" style="display: block; width: 40px; height: 40px; background: #3b82f6; border: none; border-radius: 6px; color: white; font-size: 20px; cursor: pointer; margin-bottom: 4px;">−</button>
+                                <button onclick="resetView()" style="display: block; width: 40px; height: 40px; background: #64748b; border: none; border-radius: 6px; color: white; font-size: 16px; cursor: pointer;">⟲</button>
+                            </div>
+
+                            <!-- Mode Indicator -->
+                            <div id="modeIndicator" style="position: absolute; top: 16px; left: 16px; z-index: 10; background: rgba(30, 41, 59, 0.95); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div id="pulsingDot" style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse 1.5s ease-in-out infinite;"></div>
+                                    <span style="color: white; font-weight: 600; font-size: 12px;">Drawing Mode</span>
+                                </div>
+                            </div>
+
+                            <!-- Canvas -->
+                            <canvas id="digitizerCanvas" style="display: block; max-width: 100%; cursor: grab; background: #0f172a;"></canvas>
+                        </div>
+
+                        <!-- Instructions -->
+                        <div style="margin: 16px 0; padding: 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: #334155;">💡 Instructions:</div>
+                            <ul style="margin: 0; padding-left: 20px; color: #64748b; font-size: 13px; line-height: 1.8;">
+                                <li>Click "Draw New Row" to start drawing</li>
+                                <li>Single-click to add points along a row</li>
+                                <li>Double-click to finish the current row</li>
+                                <li>Drag to pan, scroll to zoom</li>
+                                <li>Click "Export GeoJSON" when finished</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loadingText">Processing...</div>
+            <div class="loading-subtext" id="loadingSubtext"></div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765283814128-4essve.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283814128-4essve.JPG",
+  "timestamp": "2025-12-09T12:40:53.481Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.46,
+      "bbox": {
+        "x1": 811.6353759765625,
+        "y1": 1061.4417724609375,
+        "x2": 878.7048950195312,
+        "y2": 1213.7239990234375,
+        "width": 67.06951904296875,
+        "height": 152.2822265625
+      },
+      "bbox_normalized": {
+        "x_center": 0.28172338008880615,
+        "y_center": 0.505592405796051,
+        "width": 0.022356506437063217,
+        "height": 0.06768099218606949
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

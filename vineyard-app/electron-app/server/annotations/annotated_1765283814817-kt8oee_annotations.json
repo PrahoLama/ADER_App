@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765283814817-kt8oee.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283814817-kt8oee.JPG",
+  "timestamp": "2025-12-09T12:44:24.971Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "traffic light",
+      "class_id": 9,
+      "confidence": 0.521,
+      "bbox": {
+        "x1": 355.2963562011719,
+        "y1": 184.19515991210938,
+        "x2": 375.9768981933594,
+        "y2": 241.78616333007812,
+        "width": 20.6805419921875,
+        "height": 57.59100341796875
+      },
+      "bbox_normalized": {
+        "x_center": 0.5713072419166565,
+        "y_center": 0.41599738597869873,
+        "width": 0.03231334686279297,
+        "height": 0.11248242855072021
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

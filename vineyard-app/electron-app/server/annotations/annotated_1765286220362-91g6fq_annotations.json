@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765286220362-91g6fq.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286220362-91g6fq.JPG",
+  "timestamp": "2025-12-09T13:22:08.082Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "boat",
+      "class_id": 8,
+      "confidence": 0.549,
+      "bbox": {
+        "x1": 2385.650390625,
+        "y1": 966.3819580078125,
+        "x2": 2998.397705078125,
+        "y2": 1752.557373046875,
+        "width": 612.747314453125,
+        "height": 786.1754150390625
+      },
+      "bbox_normalized": {
+        "x_center": 0.8973413109779358,
+        "y_center": 0.604208767414093,
+        "width": 0.20424909889698029,
+        "height": 0.3494113087654114
+      }
+    },
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.44,
+      "bbox": {
+        "x1": 2790.01806640625,
+        "y1": 1289.9759521484375,
+        "x2": 2912.694091796875,
+        "y2": 1383.10205078125,
+        "width": 122.676025390625,
+        "height": 93.1260986328125
+      },
+      "bbox_normalized": {
+        "x_center": 0.9504519701004028,
+        "y_center": 0.5940173864364624,
+        "width": 0.04089200869202614,
+        "height": 0.04138937592506409
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

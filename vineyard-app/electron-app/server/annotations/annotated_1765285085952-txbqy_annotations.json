@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765285085952-txbqy.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285085952-txbqy.JPG",
+  "timestamp": "2025-12-09T13:02:51.690Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "frisbee",
+      "class_id": 29,
+      "confidence": 0.445,
+      "bbox": {
+        "x1": 407.5559997558594,
+        "y1": 1696.701904296875,
+        "x2": 848.6287231445312,
+        "y2": 2124.876220703125,
+        "width": 441.0727233886719,
+        "height": 428.17431640625
+      },
+      "bbox_normalized": {
+        "x_center": 0.209364116191864,
+        "y_center": 0.8492395877838135,
+        "width": 0.1470242440700531,
+        "height": 0.19029968976974487
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.39,
+      "bbox": {
+        "x1": 400.3768005371094,
+        "y1": 1632.1810302734375,
+        "x2": 1317.334716796875,
+        "y2": 2147.9228515625,
+        "width": 916.9578857421875,
+        "height": 515.7418212890625
+      },
+      "bbox_normalized": {
+        "x_center": 0.28628525137901306,
+        "y_center": 0.8400231003761292,
+        "width": 0.3056526184082031,
+        "height": 0.22921858727931976
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

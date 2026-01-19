@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765283815429-d4d8wq.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283815429-d4d8wq.JPG",
+  "timestamp": "2025-12-09T12:47:17.487Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.772,
+      "bbox": {
+        "x1": 1857.8001708984375,
+        "y1": 413.4820251464844,
+        "x2": 2080.2587890625,
+        "y2": 585.45263671875,
+        "width": 222.4586181640625,
+        "height": 171.97061157226562
+      },
+      "bbox_normalized": {
+        "x_center": 0.6563431620597839,
+        "y_center": 0.22198548913002014,
+        "width": 0.074152871966362,
+        "height": 0.07643138617277145
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.534,
+      "bbox": {
+        "x1": 646.2408447265625,
+        "y1": 823.6992797851562,
+        "x2": 695.7254028320312,
+        "y2": 940.669921875,
+        "width": 49.48455810546875,
+        "height": 116.97064208984375
+      },
+      "bbox_normalized": {
+        "x_center": 0.22366105020046234,
+        "y_center": 0.3920820355415344,
+        "width": 0.016494853422045708,
+        "height": 0.051986951380968094
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

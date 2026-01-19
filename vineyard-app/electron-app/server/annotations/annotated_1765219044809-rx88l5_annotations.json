@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765219044809-rx88l5.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765219044809-rx88l5.JPG",
+  "timestamp": "2025-12-08T18:41:13.364Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "boat",
+      "class_id": 8,
+      "confidence": 0.394,
+      "bbox": {
+        "x1": 453.8250732421875,
+        "y1": 253.76742553710938,
+        "x2": 495.2315673828125,
+        "y2": 298.3974914550781,
+        "width": 41.406494140625,
+        "height": 44.63006591796875
+      },
+      "bbox_normalized": {
+        "x_center": 0.7414504885673523,
+        "y_center": 0.5392235517501831,
+        "width": 0.06469764560461044,
+        "height": 0.08716809749603271
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765280172335-lfg1ih.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280172335-lfg1ih.JPG",
+  "timestamp": "2025-12-09T11:50:13.455Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "traffic light",
+      "class_id": 9,
+      "confidence": 0.54,
+      "bbox": {
+        "x1": 597.0760498046875,
+        "y1": 252.5718994140625,
+        "x2": 616.3983154296875,
+        "y2": 302.69378662109375,
+        "width": 19.322265625,
+        "height": 50.12188720703125
+      },
+      "bbox_normalized": {
+        "x_center": 0.9480268359184265,
+        "y_center": 0.5422516465187073,
+        "width": 0.03019103966653347,
+        "height": 0.09789431095123291
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

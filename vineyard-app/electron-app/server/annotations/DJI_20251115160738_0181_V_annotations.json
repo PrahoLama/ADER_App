@@ -1,0 +1,11 @@
+{
+  "image": "DJI_20251115160738_0181_V.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/1765034159192-001ssl.JPG",
+  "timestamp": "2025-12-06T15:16:03.868Z",
+  "industry": "agriculture",
+  "confidence_threshold": 0.9,
+  "detections": [],
+  "detection_count": 0,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

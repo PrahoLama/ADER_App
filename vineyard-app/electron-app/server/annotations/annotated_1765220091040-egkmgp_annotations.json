@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765220091040-egkmgp.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765220091040-egkmgp.JPG",
+  "timestamp": "2025-12-08T19:05:14.374Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "book",
+      "class_id": 73,
+      "confidence": 0.282,
+      "bbox": {
+        "x1": 6.1226959228515625,
+        "y1": 0.48651123046875,
+        "x2": 235.26638793945312,
+        "y2": 362.6358642578125,
+        "width": 229.14369201660156,
+        "height": 362.14935302734375
+      },
+      "bbox_normalized": {
+        "x_center": 0.18858522176742554,
+        "y_center": 0.35461169481277466,
+        "width": 0.3580370247364044,
+        "height": 0.7073229551315308
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

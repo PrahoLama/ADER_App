@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765285087236-q7fbel.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285087236-q7fbel.JPG",
+  "timestamp": "2025-12-09T13:10:01.563Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "elephant",
+      "class_id": 20,
+      "confidence": 0.67,
+      "bbox": {
+        "x1": 230.176513671875,
+        "y1": 0.072601318359375,
+        "x2": 639.3280029296875,
+        "y2": 509.88238525390625,
+        "width": 409.1514892578125,
+        "height": 509.8097839355469
+      },
+      "bbox_normalized": {
+        "x_center": 0.6793004274368286,
+        "y_center": 0.49800291657447815,
+        "width": 0.639299213886261,
+        "height": 0.995722234249115
+      }
+    },
+    {
+      "class": "book",
+      "class_id": 73,
+      "confidence": 0.524,
+      "bbox": {
+        "x1": 5.1904754638671875,
+        "y1": 0.6348876953125,
+        "x2": 234.4535675048828,
+        "y2": 364.13494873046875,
+        "width": 229.26309204101562,
+        "height": 363.50006103515625
+      },
+      "bbox_normalized": {
+        "x_center": 0.18722191452980042,
+        "y_center": 0.356220543384552,
+        "width": 0.3582235872745514,
+        "height": 0.7099610567092896
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

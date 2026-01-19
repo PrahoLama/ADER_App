@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765286221529-f1t5te.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286221529-f1t5te.JPG",
+  "timestamp": "2025-12-09T13:30:05.567Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "pizza",
+      "class_id": 53,
+      "confidence": 0.7,
+      "bbox": {
+        "x1": 0.5658111572265625,
+        "y1": 373.761962890625,
+        "x2": 228.67555236816406,
+        "y2": 511.40155029296875,
+        "width": 228.1097412109375,
+        "height": 137.63958740234375
+      },
+      "bbox_normalized": {
+        "x_center": 0.1790948212146759,
+        "y_center": 0.8644174933433533,
+        "width": 0.35642147064208984,
+        "height": 0.26882731914520264
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

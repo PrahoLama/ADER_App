@@ -1,0 +1,88 @@
+{
+  "image": "annotated_1765280172198-tiuyk.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765280172198-tiuyk.JPG",
+  "timestamp": "2025-12-09T11:49:10.103Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "bird",
+      "class_id": 14,
+      "confidence": 0.703,
+      "bbox": {
+        "x1": 2004.7747802734375,
+        "y1": 62.863853454589844,
+        "x2": 2175.318603515625,
+        "y2": 253.3431396484375,
+        "width": 170.5438232421875,
+        "height": 190.47927856445312
+      },
+      "bbox_normalized": {
+        "x_center": 0.6966822147369385,
+        "y_center": 0.07026822119951248,
+        "width": 0.056847941130399704,
+        "height": 0.0846574604511261
+      }
+    },
+    {
+      "class": "bird",
+      "class_id": 14,
+      "confidence": 0.676,
+      "bbox": {
+        "x1": 1773.35693359375,
+        "y1": 88.21314239501953,
+        "x2": 1922.462646484375,
+        "y2": 342.92254638671875,
+        "width": 149.105712890625,
+        "height": 254.70941162109375
+      },
+      "bbox_normalized": {
+        "x_center": 0.6159699559211731,
+        "y_center": 0.09580793231725693,
+        "width": 0.04970190301537514,
+        "height": 0.11320418119430542
+      }
+    },
+    {
+      "class": "bird",
+      "class_id": 14,
+      "confidence": 0.416,
+      "bbox": {
+        "x1": 1489.7672119140625,
+        "y1": 0.49182772636413574,
+        "x2": 1559.860595703125,
+        "y2": 165.95704650878906,
+        "width": 70.0933837890625,
+        "height": 165.46522521972656
+      },
+      "bbox_normalized": {
+        "x_center": 0.508271336555481,
+        "y_center": 0.03698863834142685,
+        "width": 0.023364461958408356,
+        "height": 0.073540098965168
+      }
+    },
+    {
+      "class": "bird",
+      "class_id": 14,
+      "confidence": 0.363,
+      "bbox": {
+        "x1": 2452.656982421875,
+        "y1": 295.92596435546875,
+        "x2": 2775.738037109375,
+        "y2": 502.7940979003906,
+        "width": 323.0810546875,
+        "height": 206.86813354492188
+      },
+      "bbox_normalized": {
+        "x_center": 0.8713991641998291,
+        "y_center": 0.17749334871768951,
+        "width": 0.10769368708133698,
+        "height": 0.09194139391183853
+      }
+    }
+  ],
+  "detection_count": 4,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

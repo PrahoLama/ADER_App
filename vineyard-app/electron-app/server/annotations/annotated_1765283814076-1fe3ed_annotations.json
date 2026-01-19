@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765283814076-1fe3ed.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765283814076-1fe3ed.JPG",
+  "timestamp": "2025-12-09T12:40:30.334Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "sports ball",
+      "class_id": 32,
+      "confidence": 0.459,
+      "bbox": {
+        "x1": 374.358642578125,
+        "y1": 214.50369262695312,
+        "x2": 384.3807373046875,
+        "y2": 230.40963745117188,
+        "width": 10.0220947265625,
+        "height": 15.90594482421875
+      },
+      "bbox_normalized": {
+        "x_center": 0.5927651524543762,
+        "y_center": 0.43448567390441895,
+        "width": 0.015659522265195847,
+        "height": 0.031066298484802246
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

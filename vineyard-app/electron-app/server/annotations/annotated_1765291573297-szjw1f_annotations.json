@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765291573297-szjw1f.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765291573297-szjw1f.JPG",
+  "timestamp": "2025-12-09T14:47:35.617Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "tv",
+      "class_id": 62,
+      "confidence": 0.577,
+      "bbox": {
+        "x1": 2.133331298828125,
+        "y1": 0,
+        "x2": 235.1811981201172,
+        "y2": 372.57415771484375,
+        "width": 233.04786682128906,
+        "height": 372.57415771484375
+      },
+      "bbox_normalized": {
+        "x_center": 0.18540197610855103,
+        "y_center": 0.3638419508934021,
+        "width": 0.36413729190826416,
+        "height": 0.7276839017868042
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

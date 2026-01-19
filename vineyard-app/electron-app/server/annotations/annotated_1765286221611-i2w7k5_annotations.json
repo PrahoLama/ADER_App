@@ -1,0 +1,11 @@
+{
+  "image": "annotated_1765286221611-i2w7k5.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286221611-i2w7k5.JPG",
+  "timestamp": "2025-12-09T13:30:46.147Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [],
+  "detection_count": 0,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

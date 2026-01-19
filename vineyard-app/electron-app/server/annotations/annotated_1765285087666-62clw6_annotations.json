@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765285087666-62clw6.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765285087666-62clw6.JPG",
+  "timestamp": "2025-12-09T13:12:57.665Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "book",
+      "class_id": 73,
+      "confidence": 0.384,
+      "bbox": {
+        "x1": 5.39044189453125,
+        "y1": 3.916961669921875,
+        "x2": 233.695556640625,
+        "y2": 367.73138427734375,
+        "width": 228.30511474609375,
+        "height": 363.8144226074219
+      },
+      "bbox_normalized": {
+        "x_center": 0.18678593635559082,
+        "y_center": 0.3629378378391266,
+        "width": 0.356726735830307,
+        "height": 0.7105750441551208
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

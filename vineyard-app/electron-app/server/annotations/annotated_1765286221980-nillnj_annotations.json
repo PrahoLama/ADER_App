@@ -1,0 +1,31 @@
+{
+  "image": "annotated_1765286221980-nillnj.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765286221980-nillnj.JPG",
+  "timestamp": "2025-12-09T13:33:16.163Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "boat",
+      "class_id": 8,
+      "confidence": 0.371,
+      "bbox": {
+        "x1": 2687.803466796875,
+        "y1": 809.5318603515625,
+        "x2": 2999.06884765625,
+        "y2": 1434.0416259765625,
+        "width": 311.265380859375,
+        "height": 624.509765625
+      },
+      "bbox_normalized": {
+        "x_center": 0.947812020778656,
+        "y_center": 0.49857187271118164,
+        "width": 0.10375512391328812,
+        "height": 0.27755990624427795
+      }
+    }
+  ],
+  "detection_count": 1,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

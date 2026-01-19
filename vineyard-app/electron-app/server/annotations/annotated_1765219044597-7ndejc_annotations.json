@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765219044597-7ndejc.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765219044597-7ndejc.JPG",
+  "timestamp": "2025-12-08T18:39:51.197Z",
+  "industry": "general",
+  "confidence_threshold": 0.25,
+  "detections": [
+    {
+      "class": "car",
+      "class_id": 2,
+      "confidence": 0.396,
+      "bbox": {
+        "x1": 1932.7208251953125,
+        "y1": 1536.74169921875,
+        "x2": 2091.02685546875,
+        "y2": 1724.6458740234375,
+        "width": 158.3060302734375,
+        "height": 187.9041748046875
+      },
+      "bbox_normalized": {
+        "x_center": 0.6706246137619019,
+        "y_center": 0.7247528433799744,
+        "width": 0.05276867747306824,
+        "height": 0.08351296931505203
+      }
+    },
+    {
+      "class": "truck",
+      "class_id": 7,
+      "confidence": 0.34,
+      "bbox": {
+        "x1": 1932.0577392578125,
+        "y1": 1537.1405029296875,
+        "x2": 2091.163818359375,
+        "y2": 1724.6143798828125,
+        "width": 159.1060791015625,
+        "height": 187.473876953125
+      },
+      "bbox_normalized": {
+        "x_center": 0.6705369353294373,
+        "y_center": 0.7248344421386719,
+        "width": 0.05303535982966423,
+        "height": 0.0833217203617096
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}

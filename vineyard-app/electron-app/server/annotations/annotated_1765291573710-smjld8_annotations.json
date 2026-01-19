@@ -1,0 +1,50 @@
+{
+  "image": "annotated_1765291573710-smjld8.JPG",
+  "image_path": "/home/praho/WebstormProjects/ADER_App/vineyard-app/backend/uploads/annotated_1765291573710-smjld8.JPG",
+  "timestamp": "2025-12-09T14:50:01.759Z",
+  "industry": "general",
+  "confidence_threshold": 0.35,
+  "detections": [
+    {
+      "class": "boat",
+      "class_id": 8,
+      "confidence": 0.58,
+      "bbox": {
+        "x1": 1771.0869140625,
+        "y1": 525.9808959960938,
+        "x2": 2141.876220703125,
+        "y2": 851.4571533203125,
+        "width": 370.789306640625,
+        "height": 325.47625732421875
+      },
+      "bbox_normalized": {
+        "x_center": 0.6521605253219604,
+        "y_center": 0.3060973286628723,
+        "width": 0.1235964372754097,
+        "height": 0.14465612173080444
+      }
+    },
+    {
+      "class": "person",
+      "class_id": 0,
+      "confidence": 0.444,
+      "bbox": {
+        "x1": 799.3336181640625,
+        "y1": 485.47265625,
+        "x2": 889.590576171875,
+        "y2": 611.4592895507812,
+        "width": 90.2569580078125,
+        "height": 125.98663330078125
+      },
+      "bbox_normalized": {
+        "x_center": 0.281487375497818,
+        "y_center": 0.24376264214515686,
+        "width": 0.030085653066635132,
+        "height": 0.05599405989050865
+      }
+    }
+  ],
+  "detection_count": 2,
+  "manual_corrections": [],
+  "status": "auto_annotated"
+}
