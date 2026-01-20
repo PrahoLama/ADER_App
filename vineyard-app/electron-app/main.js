@@ -5,7 +5,7 @@
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, fork } = require('child_process');
 const fs = require('fs');
 
 // Handle EPIPE errors when running in background
@@ -712,6 +712,9 @@ function startServer() {
       DJI_API_KEY: process.env.DJI_API_KEY || '6a1613c4a95bea88c227b4b760e528e'
     };
     
+    // Apply env vars to current process for in-process server
+    Object.assign(process.env, env);
+    
     console.log('🚀 Starting backend server...');
     console.log('   App packaged:', app.isPackaged);
     console.log('   Resources path:', process.resourcesPath);
@@ -726,16 +729,79 @@ function startServer() {
       return;
     }
     
-    // Start server with correct working directory and increased memory
-    serverProcess = spawn('node', [
-      '--max-old-space-size=4096', // 4GB memory limit
-      '--expose-gc', // Enable garbage collection
-      serverPath
-    ], { 
-      env, 
-      stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: serverCwd
-    });
+    // Try to run the server in the same process using require()
+    // This avoids needing to spawn a separate Node process
+    try {
+      // Change to server directory for relative requires
+      const originalCwd = process.cwd();
+      process.chdir(serverCwd);
+      
+      // Clear require cache to ensure fresh load
+      delete require.cache[require.resolve(serverPath)];
+      
+      // Require the server - it should start listening automatically
+      console.log('📡 Loading server module...');
+      require(serverPath);
+      
+      // Restore original directory
+      process.chdir(originalCwd);
+      
+      console.log('✅ Server started successfully on port', SERVER_PORT);
+      
+      // Give it a moment to fully initialize
+      setTimeout(() => resolve(), 1000);
+      return;
+    } catch (requireError) {
+      console.log('⚠️ In-process server failed:', requireError.message);
+      console.log('   Falling back to subprocess...');
+    }
+    
+    // Fallback: Find Node.js and spawn subprocess
+    let nodePath = 'node';
+    
+    if (app.isPackaged) {
+      const possibleNodePaths = [
+        'node',
+        'C:\\Program Files\\nodejs\\node.exe',
+        'C:\\Program Files (x86)\\nodejs\\node.exe',
+        path.join(process.env.APPDATA || '', '..', 'Local', 'Programs', 'nodejs', 'node.exe'),
+        path.join(process.env.ProgramFiles || '', 'nodejs', 'node.exe'),
+      ];
+      
+      for (const np of possibleNodePaths) {
+        try {
+          execSync(`"${np}" --version`, { stdio: 'pipe' });
+          nodePath = np;
+          console.log('✅ Found Node.js at:', nodePath);
+          break;
+        } catch (e) {
+          // Continue searching
+        }
+      }
+    }
+    
+    console.log('   Using Node.js subprocess:', nodePath);
+    
+    // Use fork with Electron's Node
+    try {
+      serverProcess = fork(serverPath, [], { 
+        env, 
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        cwd: serverCwd,
+        execArgv: ['--max-old-space-size=4096']
+      });
+    } catch (forkError) {
+      console.log('Fork failed, trying spawn:', forkError.message);
+      serverProcess = spawn(nodePath, [
+        '--max-old-space-size=4096',
+        serverPath
+      ], { 
+        env, 
+        stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: serverCwd,
+        shell: true
+      });
+    }
     
     let serverStarted = false;
     
