@@ -1846,28 +1846,39 @@ function downloadAnnotationJSON() {
 async function downloadAnnotatedImages() {
     if (!window.annotationResult || !window.annotationResult.data.annotatedImages) return;
     
-    showToast('Preparing download...', 'info');
+    showToast('Preparing ZIP download...', 'info');
     
-    // Download each annotated image
-    for (const img of window.annotationResult.data.annotatedImages) {
-        try {
-            const response = await fetch(`http://localhost:8080${img.downloadUrl}`);
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = img.originalName;
-            link.click();
-            URL.revokeObjectURL(url);
-            
-            // Small delay between downloads
-            await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (error) {
-            console.error('Download error:', error);
+    try {
+        // Get all filenames for ZIP download
+        const filenames = window.annotationResult.data.annotatedImages.map(img => img.filename);
+        
+        // Request ZIP from server
+        const response = await fetch('http://localhost:8080/api/download-zip', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filenames: filenames })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to create ZIP');
         }
+        
+        // Download the ZIP file
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `annotated_images_${Date.now()}.zip`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        showToast(`Downloaded ${filenames.length} images as ZIP`, 'success');
+    } catch (error) {
+        console.error('ZIP download error:', error);
+        showToast('Failed to download ZIP: ' + error.message, 'error');
     }
-    
-    showToast('All annotated images downloaded', 'success');
 }
 
 // ==================== MANUAL ANNOTATION EDITOR ====================

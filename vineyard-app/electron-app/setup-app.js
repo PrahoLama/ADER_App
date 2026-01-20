@@ -15,9 +15,8 @@ const SERVER_TARGET = path.join(ROOT, 'server');
 console.log('🚀 ADER Drone Analyzer - Complete Setup Script');
 console.log('='.repeat(60));
 
-// Backend files to copy
+// Backend files to copy (server.js is handled separately to preserve Electron modifications)
 const backendFiles = [
-  'server.js',
   'yolo_detector.py',
   'draw_annotations.py',
   'dji_log_analyzer.py',
@@ -145,7 +144,7 @@ async function main() {
     
     // Step 5: Create required directories
     console.log('\n📁 Step 5: Creating required directories...');
-    const requiredDirs = ['uploads', 'cache', 'tmp', 'dji-log'];
+    const requiredDirs = ['uploads', 'cache', 'tmp', 'dji-log', 'annotations'];
     for (const dir of requiredDirs) {
       ensureDir(path.join(SERVER_TARGET, dir));
     }

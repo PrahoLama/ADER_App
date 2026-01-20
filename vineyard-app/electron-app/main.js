@@ -272,11 +272,20 @@ async function autoInstallPython() {
     });
     
     // Step 5: Install packages (CPU-only torch for smaller size)
+    // FULL package list for all features (orthophoto analysis, YOLO detection, etc.)
     const packages = [
       { name: 'torch torchvision --index-url https://download.pytorch.org/whl/cpu', display: 'PyTorch (AI engine)' },
       { name: 'ultralytics', display: 'YOLO (object detection)' },
       { name: 'opencv-python-headless', display: 'OpenCV (image processing)' },
-      { name: 'numpy pillow', display: 'NumPy & Pillow' }
+      { name: 'numpy pillow', display: 'NumPy & Pillow' },
+      { name: 'rasterio', display: 'Rasterio (geospatial raster)' },
+      { name: 'geopandas', display: 'GeoPandas (geospatial data)' },
+      { name: 'shapely', display: 'Shapely (geometry)' },
+      { name: 'scikit-image', display: 'Scikit-Image (image analysis)' },
+      { name: 'scikit-learn', display: 'Scikit-Learn (machine learning)' },
+      { name: 'matplotlib', display: 'Matplotlib (plotting)' },
+      { name: 'fiona', display: 'Fiona (geospatial I/O)' },
+      { name: 'pyproj', display: 'PyProj (coordinate transforms)' }
     ];
     
     const pipExe = path.join(pythonDir, 'Scripts', 'pip.exe');
@@ -311,7 +320,7 @@ async function autoInstallPython() {
     // Show error dialog
     dialog.showErrorBox(
       'Setup Failed',
-      `Could not install Python automatically.\n\nPlease install Python 3.9+ manually from python.org and run:\npip install ultralytics opencv-python numpy pillow\n\nError: ${error.message}`
+      `Could not install Python automatically.\n\nPlease install Python 3.9+ manually from python.org and run:\npip install ultralytics opencv-python-headless numpy pillow rasterio geopandas shapely scikit-image scikit-learn matplotlib\n\nError: ${error.message}`
     );
     
     return null;
@@ -326,7 +335,7 @@ async function ensurePythonSetup() {
     if (!python) {
       dialog.showErrorBox(
         'Python Required',
-        'Python 3.9+ is required.\n\nPlease install Python and run:\npip install ultralytics opencv-python numpy pillow'
+        'Python 3.9+ is required.\n\nPlease install Python and run:\npip install ultralytics opencv-python-headless numpy pillow rasterio geopandas shapely scikit-image scikit-learn matplotlib'
       );
     }
     return python;
@@ -336,12 +345,9 @@ async function ensurePythonSetup() {
   let python = findPython();
   
   if (python) {
-    // Verify dependencies
-    const depsOK = await checkPythonDeps(python);
-    if (depsOK) {
-      return python;
-    }
-    console.log('⚠️ Python found but missing dependencies');
+    // Python found - return it, the startup code will check and install missing deps
+    console.log('✅ Found Python:', python);
+    return python;
   }
   
   // Need to install Python
@@ -352,16 +358,56 @@ async function ensurePythonSetup() {
 // Check Python dependencies
 async function checkPythonDeps(pythonPath) {
   return new Promise((resolve) => {
+    // Check ALL required packages for orthophoto analysis and YOLO
     const checkScript = `
 import sys
+missing = []
 try:
     import cv2
+except ImportError:
+    missing.append('opencv-python-headless')
+try:
     import numpy
+except ImportError:
+    missing.append('numpy')
+try:
     from ultralytics import YOLO
-    print("OK")
-except ImportError as e:
-    print(f"MISSING: {e}")
+except ImportError:
+    missing.append('ultralytics')
+try:
+    import rasterio
+except ImportError:
+    missing.append('rasterio')
+try:
+    import geopandas
+except ImportError:
+    missing.append('geopandas')
+try:
+    import shapely
+except ImportError:
+    missing.append('shapely')
+try:
+    import skimage
+except ImportError:
+    missing.append('scikit-image')
+try:
+    import sklearn
+except ImportError:
+    missing.append('scikit-learn')
+try:
+    import matplotlib
+except ImportError:
+    missing.append('matplotlib')
+try:
+    import PIL
+except ImportError:
+    missing.append('pillow')
+
+if missing:
+    print(f"MISSING: {', '.join(missing)}")
     sys.exit(1)
+else:
+    print("OK")
 `;
     
     const proc = spawn(pythonPath, ['-c', checkScript]);
@@ -380,6 +426,61 @@ except ImportError as e:
       }
     });
   });
+}
+
+// Install missing Python dependencies
+async function installMissingPythonDeps(pythonPath) {
+  console.log('📦 Installing missing Python dependencies...');
+  showSetupWindow('Installing missing Python packages...');
+  
+  const pythonDir = path.dirname(pythonPath);
+  const pipExe = path.join(pythonDir, 'Scripts', 'pip.exe');
+  
+  // Use pip directly if available, otherwise use python -m pip
+  const pipCmd = fs.existsSync(pipExe) ? pipExe : `"${pythonPath}" -m pip`;
+  
+  // All required packages
+  const packages = [
+    { name: 'torch torchvision --index-url https://download.pytorch.org/whl/cpu', display: 'PyTorch' },
+    { name: 'ultralytics', display: 'YOLO' },
+    { name: 'opencv-python-headless', display: 'OpenCV' },
+    { name: 'numpy pillow', display: 'NumPy & Pillow' },
+    { name: 'rasterio', display: 'Rasterio' },
+    { name: 'geopandas', display: 'GeoPandas' },
+    { name: 'shapely', display: 'Shapely' },
+    { name: 'scikit-image', display: 'Scikit-Image' },
+    { name: 'scikit-learn', display: 'Scikit-Learn' },
+    { name: 'matplotlib', display: 'Matplotlib' },
+    { name: 'fiona', display: 'Fiona' },
+    { name: 'pyproj', display: 'PyProj' }
+  ];
+  
+  for (const pkg of packages) {
+    showSetupWindow(`Installing ${pkg.display}...`);
+    console.log(`📦 Installing ${pkg.name}...`);
+    try {
+      if (fs.existsSync(pipExe)) {
+        execSync(`"${pipExe}" install ${pkg.name} --no-warn-script-location`, { 
+          stdio: 'pipe',
+          cwd: pythonDir,
+          timeout: 300000
+        });
+      } else {
+        execSync(`"${pythonPath}" -m pip install ${pkg.name} --no-warn-script-location`, { 
+          stdio: 'pipe',
+          timeout: 300000
+        });
+      }
+    } catch (err) {
+      console.warn(`⚠️ Warning installing ${pkg.name}:`, err.message);
+    }
+  }
+  
+  closeSetupWindow();
+  console.log('✅ Finished installing dependencies');
+  
+  // Re-check dependencies
+  return await checkPythonDeps(pythonPath);
 }
 
 // Ensure custom NodeODM image exists with python-dateutil pre-installed
@@ -681,21 +782,23 @@ function stopNodeODM() {
 
 // Start the embedded Express server
 function startServer() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     // Use the embedded server folder - handle both dev and production
     let serverPath;
     let serverCwd;
     
     if (app.isPackaged) {
       // In production, server folder is in extraResources
-      const resourcesPath = process.resourcesPath;
-      serverPath = path.join(resourcesPath, 'server', 'server.js');
-      serverCwd = path.join(resourcesPath, 'server');
+      serverPath = path.join(process.resourcesPath, 'server', 'server.js');
+      serverCwd = path.join(process.resourcesPath, 'server');
     } else {
       // Development mode
       serverPath = path.join(__dirname, 'server', 'server.js');
       serverCwd = path.join(__dirname, 'server');
     }
+    
+    // Get Python path early
+    const pythonPath = findPython();
     
     // Set environment variables for the server
     const env = {
@@ -706,139 +809,187 @@ function startServer() {
       CACHE_DIR: cacheDir,
       LOGS_DIR: logsDir,
       TMP_DIR: tmpDir,
-      PYTHON_PATH: findPython() || 'python',
+      PYTHON_PATH: pythonPath || '',
+      PYTHON_EXECUTABLE: pythonPath || '',
       NODE_ENV: 'production',
       ELECTRON_APP: 'true',
+      ELECTRON_PACKAGED: app.isPackaged ? 'true' : 'false',
+      RESOURCES_PATH: app.isPackaged ? process.resourcesPath : __dirname,
+      SERVER_CWD: serverCwd,
+      APPDATA: process.env.APPDATA || '',
+      LOCALAPPDATA: process.env.LOCALAPPDATA || '',
       DJI_API_KEY: process.env.DJI_API_KEY || '6a1613c4a95bea88c227b4b760e528e'
     };
     
-    // Apply env vars to current process for in-process server
-    Object.assign(process.env, env);
-    
     console.log('🚀 Starting backend server...');
     console.log('   App packaged:', app.isPackaged);
-    console.log('   Resources path:', process.resourcesPath);
     console.log('   Server path:', serverPath);
     console.log('   Server CWD:', serverCwd);
-    console.log('   Data directory:', dataDir);
+    console.log('   Python path:', pythonPath || 'NOT FOUND');
     
     // Check if server file exists
     if (!fs.existsSync(serverPath)) {
-      console.error('❌ Server file not found:', serverPath);
-      reject(new Error('Server files not found: ' + serverPath));
+      const errorMsg = `Server files not found at: ${serverPath}`;
+      console.error('❌', errorMsg);
+      dialog.showErrorBox('Server Error', errorMsg);
+      reject(new Error(errorMsg));
       return;
     }
     
-    // Try to run the server in the same process using require()
-    // This avoids needing to spawn a separate Node process
+    // Check if server node_modules exists
+    const serverNodeModules = path.join(serverCwd, 'node_modules');
+    const hasServerModules = fs.existsSync(serverNodeModules);
+    console.log('   Server node_modules:', hasServerModules ? 'Found' : 'Missing (will use app modules)');
+    
+    // Apply env vars to current process
+    Object.assign(process.env, env);
+    
+    // Try to run the server in-process first (most reliable)
     try {
-      // Change to server directory for relative requires
       const originalCwd = process.cwd();
       process.chdir(serverCwd);
       
-      // Clear require cache to ensure fresh load
-      delete require.cache[require.resolve(serverPath)];
+      // Set up module resolution to find dependencies
+      const Module = require('module');
+      const originalResolve = Module._resolveFilename;
+      Module._resolveFilename = function(request, parent, isMain, options) {
+        // Try server's node_modules first, then fall back to app's
+        const serverModulePath = path.join(serverCwd, 'node_modules', request);
+        if (fs.existsSync(serverModulePath) || fs.existsSync(serverModulePath + '.js')) {
+          try {
+            return originalResolve.call(this, request, parent, isMain, options);
+          } catch (e) {}
+        }
+        return originalResolve.call(this, request, parent, isMain, options);
+      };
       
-      // Require the server - it should start listening automatically
-      console.log('📡 Loading server module...');
+      console.log('📡 Loading server module in-process...');
+      
+      // Clear cache and load server
+      delete require.cache[require.resolve(serverPath)];
+      global.serverReady = false;  // Reset flag
       require(serverPath);
       
-      // Restore original directory
       process.chdir(originalCwd);
       
-      console.log('✅ Server started successfully on port', SERVER_PORT);
+      // Wait for server to signal it's ready (via global flag)
+      console.log('⏳ Waiting for server to bind to port...');
       
-      // Give it a moment to fully initialize
-      setTimeout(() => resolve(), 1000);
-      return;
-    } catch (requireError) {
-      console.log('⚠️ In-process server failed:', requireError.message);
-      console.log('   Falling back to subprocess...');
-    }
-    
-    // Fallback: Find Node.js and spawn subprocess
-    let nodePath = 'node';
-    
-    if (app.isPackaged) {
-      const possibleNodePaths = [
-        'node',
-        'C:\\Program Files\\nodejs\\node.exe',
-        'C:\\Program Files (x86)\\nodejs\\node.exe',
-        path.join(process.env.APPDATA || '', '..', 'Local', 'Programs', 'nodejs', 'node.exe'),
-        path.join(process.env.ProgramFiles || '', 'nodejs', 'node.exe'),
-      ];
-      
-      for (const np of possibleNodePaths) {
-        try {
-          execSync(`"${np}" --version`, { stdio: 'pipe' });
-          nodePath = np;
-          console.log('✅ Found Node.js at:', nodePath);
-          break;
-        } catch (e) {
-          // Continue searching
-        }
-      }
-    }
-    
-    console.log('   Using Node.js subprocess:', nodePath);
-    
-    // Use fork with Electron's Node
-    try {
-      serverProcess = fork(serverPath, [], { 
-        env, 
-        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-        cwd: serverCwd,
-        execArgv: ['--max-old-space-size=4096']
-      });
-    } catch (forkError) {
-      console.log('Fork failed, trying spawn:', forkError.message);
-      serverProcess = spawn(nodePath, [
-        '--max-old-space-size=4096',
-        serverPath
-      ], { 
-        env, 
-        stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: serverCwd,
-        shell: true
-      });
-    }
-    
-    let serverStarted = false;
-    
-    serverProcess.stdout.on('data', (data) => {
-      const output = data.toString();
-      console.log('[Server]', output.trim());
-      
-      if (output.includes('SERVER RUNNING') || output.includes('Waiting for requests')) {
-        if (!serverStarted) {
-          serverStarted = true;
-          console.log('✅ Server started successfully on port', SERVER_PORT);
+      for (let attempt = 1; attempt <= 15; attempt++) {
+        await new Promise(r => setTimeout(r, 500));
+        
+        // Check if server set the ready flag
+        if (global.serverReady) {
+          console.log(`✅ Server started successfully on port ${SERVER_PORT} (ready signal received)`);
           resolve();
+          return;
         }
+        
+        console.log(`   Waiting for server ready signal... (${attempt}/15)`);
       }
-    });
-    
-    serverProcess.stderr.on('data', (data) => {
-      console.error('[Server Error]', data.toString().trim());
-    });
-    
-    serverProcess.on('error', (err) => {
-      console.error('❌ Failed to start server:', err);
-      reject(err);
-    });
-    
-    serverProcess.on('close', (code) => {
-      console.log('Server process exited with code:', code);
-      serverProcess = null;
-    });
-    
-    // Timeout for server startup
-    setTimeout(() => {
-      if (!serverStarted) {
-        console.log('⏱️ Server startup timeout, assuming it is ready...');
-        resolve();
+      
+      // If flag wasn't set, try HTTP health check as fallback
+      console.log('   Trying HTTP health check as fallback...');
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const isRunning = await checkServerHealth();
+        if (isRunning) {
+          console.log(`✅ Server confirmed via health check on port ${SERVER_PORT}`);
+          resolve();
+          return;
+        }
+        await new Promise(r => setTimeout(r, 1000));
       }
-    }, 10000);
+      
+      console.log('⚠️ Server loaded but ready signal not received');
+    } catch (requireError) {
+      console.error('⚠️ In-process server failed:', requireError.message);
+      console.error('   Stack:', requireError.stack);
+    }
+    
+    // Fallback: spawn as subprocess using Electron's bundled Node
+    console.log('🔄 Trying subprocess mode...');
+    
+    try {
+      serverProcess = fork(serverPath, [], {
+        env,
+        cwd: serverCwd,
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        execArgv: []
+      });
+      
+      let serverOutput = '';
+      
+      serverProcess.stdout.on('data', (data) => {
+        const text = data.toString();
+        serverOutput += text;
+        console.log('[Server]', text.trim());
+      });
+      
+      serverProcess.stderr.on('data', (data) => {
+        const text = data.toString();
+        serverOutput += text;
+        console.error('[Server Error]', text.trim());
+      });
+      
+      serverProcess.on('error', (err) => {
+        console.error('❌ Server process error:', err);
+      });
+      
+      serverProcess.on('exit', (code) => {
+        if (code !== 0 && code !== null) {
+          console.error('❌ Server exited with code:', code);
+          console.error('   Output:', serverOutput);
+        }
+      });
+      
+      // Wait for server to be ready
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 500));
+        const isRunning = await checkServerHealth();
+        if (isRunning) {
+          console.log('✅ Server subprocess started on port', SERVER_PORT);
+          resolve();
+          return;
+        }
+        attempts++;
+      }
+      
+      console.error('❌ Server failed to start after', maxAttempts, 'attempts');
+      console.error('   Server output:', serverOutput);
+      
+    } catch (forkError) {
+      console.error('❌ Fork failed:', forkError.message);
+    }
+    
+    // Show error to user
+    dialog.showErrorBox(
+      'Server Failed to Start',
+      'The backend server could not be started.\n\nPlease try:\n1. Restart the application\n2. Check if port 8080 is in use\n3. Reinstall the application'
+    );
+    
+    resolve(); // Resolve anyway to let the app show (user can see the error)
+  });
+}
+
+// Check if server is responding
+async function checkServerHealth() {
+  return new Promise((resolve) => {
+    const http = require('http');
+    const req = http.get(`http://localhost:${SERVER_PORT}/api/health`, (res) => {
+      // Accept any 2xx status code
+      resolve(res.statusCode >= 200 && res.statusCode < 300);
+    });
+    req.on('error', (err) => {
+      // Connection refused or other network error - server not ready yet
+      resolve(false);
+    });
+    req.setTimeout(3000, () => {
+      req.destroy();
+      resolve(false);
+    });
   });
 }
 
@@ -1021,6 +1172,12 @@ app.whenReady().then(async () => {
     
     if (pythonPath) {
       pythonReady = await checkPythonDeps(pythonPath);
+      
+      // Auto-install missing dependencies if needed
+      if (!pythonReady) {
+        splash.webContents.send('status', 'Installing Python dependencies...');
+        pythonReady = await installMissingPythonDeps(pythonPath);
+      }
     }
     
     // Step 3: Start NodeODM (WebODM processing)

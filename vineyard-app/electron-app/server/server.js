@@ -3,14 +3,192 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const FormData = require('form-data');
 const axios = require('axios');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const readline = require('readline');
 const archiver = require('archiver');
-require('dotenv').config();
+
+// Only load dotenv if not running in Electron
+if (!process.env.ELECTRON_APP) {
+  require('dotenv').config();
+}
+
+// Determine if running in Electron packaged app
+const isElectron = process.env.ELECTRON_APP === 'true';
+const isPackaged = process.env.ELECTRON_PACKAGED === 'true';
+
+// Get directories from environment (Electron passes these) or use defaults
+const baseUploadDir = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
+const baseCacheDir = process.env.CACHE_DIR || path.join(__dirname, 'cache');
+const baseAnnotationsDir = process.env.ANNOTATIONS_DIR || path.join(__dirname, 'annotations');
+const baseLogsDir = process.env.LOGS_DIR || path.join(__dirname, 'dji-log');
+const baseTmpDir = process.env.TMP_DIR || path.join(__dirname, 'tmp');
+
+// Python path detection - comprehensive search
+let pythonPath = process.env.PYTHON_PATH || process.env.PYTHON_EXECUTABLE || null;
+
+function findPython() {
+  // If already set from environment, verify it exists
+  if (pythonPath && fs.existsSync(pythonPath)) {
+    console.log('🐍 Using Python from env:', pythonPath);
+    return pythonPath;
+  }
+  
+  // Check Electron user data directory (where auto-install puts Python)
+  // On Windows: %APPDATA%/ader-vineyard-app/python/python.exe
+  const appDataPath = process.env.APPDATA || '';
+  const electronPythonPaths = [
+    path.join(appDataPath, 'ader-vineyard-app', 'python', 'python.exe'),
+    path.join(appDataPath, 'ADER Drone Analyzer', 'python', 'python.exe'),
+  ];
+  
+  for (const pyPath of electronPythonPaths) {
+    if (fs.existsSync(pyPath)) {
+      console.log('🐍 Found Electron-installed Python:', pyPath);
+      pythonPath = pyPath;
+      return pyPath;
+    }
+  }
+  
+  // Check common system Python installations
+  const systemPythonPaths = [
+    'C:\\Python311\\python.exe',
+    'C:\\Python310\\python.exe',
+    'C:\\Python39\\python.exe',
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe'),
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python310', 'python.exe'),
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python39', 'python.exe'),
+  ];
+  
+  for (const pyPath of systemPythonPaths) {
+    if (fs.existsSync(pyPath)) {
+      console.log('🐍 Found system Python:', pyPath);
+      pythonPath = pyPath;
+      return pyPath;
+    }
+  }
+  
+  // Try running 'python' command (but NOT on Windows to avoid Store alias)
+  if (process.platform !== 'win32') {
+    try {
+      execSync('python3 --version', { stdio: 'pipe' });
+      pythonPath = 'python3';
+      return pythonPath;
+    } catch (e) {
+      // Not found
+    }
+  }
+  
+  console.error('❌ Python not found! Please ensure Python is installed.');
+  console.error('   Checked paths:', [...electronPythonPaths, ...systemPythonPaths]);
+  return null;
+}
+
+// Initialize Python path
+pythonPath = findPython();
+
+console.log('🚀 Server starting with configuration:');
+console.log('   Electron mode:', isElectron);
+console.log('   Packaged:', isPackaged);
+console.log('   Upload dir:', baseUploadDir);
+console.log('   Python path:', pythonPath || 'NOT FOUND');
+
+// DJI Log Parser binary path
+const djiLogBinaryPath = path.join(__dirname, process.platform === 'win32' ? 'dji-log.exe' : 'dji-log');
+let djiLogAvailable = fs.existsSync(djiLogBinaryPath);
+
+// Auto-download dji-log binary if missing
+async function ensureDjiLogBinary() {
+  if (fs.existsSync(djiLogBinaryPath)) {
+    console.log('✅ DJI Log parser found:', djiLogBinaryPath);
+    return true;
+  }
+  
+  console.log('📥 DJI Log parser not found, downloading...');
+  
+  // Determine platform-specific download URL
+  const platform = process.platform;
+  const arch = process.arch;
+  
+  let binaryUrl;
+  let binaryName;
+  
+  if (platform === 'win32') {
+    binaryUrl = 'https://github.com/lvauvillier/dji-log-parser/releases/download/v0.5.3/dji-log-x86_64-pc-windows-msvc.zip';
+    binaryName = 'dji-log.exe';
+  } else if (platform === 'darwin') {
+    binaryUrl = arch === 'arm64' 
+      ? 'https://github.com/lvauvillier/dji-log-parser/releases/download/v0.5.3/dji-log-aarch64-apple-darwin.tar.gz'
+      : 'https://github.com/lvauvillier/dji-log-parser/releases/download/v0.5.3/dji-log-x86_64-apple-darwin.tar.gz';
+    binaryName = 'dji-log';
+  } else {
+    binaryUrl = 'https://github.com/lvauvillier/dji-log-parser/releases/download/v0.5.3/dji-log-x86_64-unknown-linux-gnu.tar.gz';
+    binaryName = 'dji-log';
+  }
+  
+  try {
+    const response = await axios({
+      method: 'get',
+      url: binaryUrl,
+      responseType: 'arraybuffer',
+      timeout: 60000  // 60 second timeout
+    });
+    
+    const archivePath = path.join(__dirname, 'dji-log-archive' + (platform === 'win32' ? '.zip' : '.tar.gz'));
+    fs.writeFileSync(archivePath, response.data);
+    
+    // Extract based on platform
+    if (platform === 'win32') {
+      // Use PowerShell to extract zip on Windows
+      try {
+        execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${__dirname}' -Force"`, { stdio: 'pipe' });
+      } catch (e) {
+        // Try with built-in unzip if available
+        execSync(`tar -xf "${archivePath}" -C "${__dirname}"`, { stdio: 'pipe' });
+      }
+    } else {
+      execSync(`tar -xzf "${archivePath}" -C "${__dirname}"`, { stdio: 'pipe' });
+    }
+    
+    // Clean up archive
+    fs.unlinkSync(archivePath);
+    
+    // Make executable on Unix
+    if (platform !== 'win32') {
+      fs.chmodSync(djiLogBinaryPath, '755');
+    }
+    
+    if (fs.existsSync(djiLogBinaryPath)) {
+      console.log('✅ DJI Log parser downloaded successfully');
+      djiLogAvailable = true;
+      return true;
+    } else {
+      // Check if it was extracted with a different name
+      const possibleNames = ['dji-log.exe', 'dji-log', 'dji_log.exe', 'dji_log'];
+      for (const name of possibleNames) {
+        const checkPath = path.join(__dirname, name);
+        if (fs.existsSync(checkPath) && checkPath !== djiLogBinaryPath) {
+          fs.renameSync(checkPath, djiLogBinaryPath);
+          console.log('✅ DJI Log parser renamed and ready');
+          djiLogAvailable = true;
+          return true;
+        }
+      }
+      console.warn('⚠️ DJI Log parser extraction failed');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Failed to download DJI Log parser:', error.message);
+    console.log('   Manual download: https://github.com/lvauvillier/dji-log-parser/releases');
+    return false;
+  }
+}
+
+// Try to download dji-log at startup
+ensureDjiLogBinary().catch(err => console.error('DJI Log setup error:', err));
 
 // Optional: Install exif-parser for better timestamp extraction
 let ExifParser;
@@ -21,7 +199,7 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Enhanced logging middleware
 app.use((req, res, next) => {
@@ -39,11 +217,12 @@ app.use(cors({
 
 app.use(express.json());
 
-// Create uploads and cache directories
-const uploadDir = path.join(__dirname, 'uploads');
-const cacheDir = path.join(__dirname, 'cache');
+// Create uploads and cache directories - use configured paths
+const uploadDir = baseUploadDir;
+const cacheDir = baseCacheDir;
+const annotationsDir = baseAnnotationsDir;
 
-[uploadDir, cacheDir].forEach(dir => {
+[uploadDir, cacheDir, annotationsDir, baseLogsDir, baseTmpDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
     console.log('✅ Created directory:', dir);
@@ -82,6 +261,10 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'Backend running', 
     timestamp: new Date(),
+    python: {
+      available: !!pythonPath,
+      path: pythonPath || 'NOT FOUND - Please install Python 3.9+'
+    },
     odm: {
       installed: odmInstalled,
       path: odmInstalled ? odmPath : null,
@@ -303,7 +486,8 @@ app.post('/api/annotate-images', upload.fields([
   console.log('📸 IMAGE ANNOTATION REQUEST - ULTRA OPTIMIZED VERSION');
   console.log('='.repeat(60));
 
-  const djiLogBinary = path.join(__dirname, 'dji-log');
+  // Use the global dji-log binary path
+  const djiLogBinary = djiLogBinaryPath;
   const uploadedLogFiles = [];
   const uploadedImagePaths = [];
 
@@ -335,9 +519,13 @@ app.post('/api/annotate-images', upload.fields([
       });
     });
 
-    // Check if dji-log binary exists
+    // Check if dji-log binary exists, try to download if not
     if (!fs.existsSync(djiLogBinary)) {
-      throw new Error('dji-log binary not found. Download from https://github.com/lvauvillier/dji-log-parser/releases');
+      console.log('⚠️ DJI Log parser not found, attempting download...');
+      const downloaded = await ensureDjiLogBinary();
+      if (!downloaded) {
+        throw new Error('DJI Log parser (dji-log) not available. Please download from https://github.com/lvauvillier/dji-log-parser/releases and place in the server folder.');
+      }
     }
 
     // ============================================================
@@ -470,6 +658,78 @@ app.post('/api/annotate-images', upload.fields([
 
     console.log(`✅ Successfully annotated ${annotatedImagePaths.length}/${annotations.length} images`);
 
+    // ============================================================
+    // STEP 2.5: YOLO Auto-Annotation (if enabled)
+    // ============================================================
+    let yoloResults = [];
+    let yoloDetectionCount = 0;
+    const enableYolo = req.body.enableYolo === 'true';
+    const yoloIndustry = req.body.yoloIndustry || 'agriculture';
+    const yoloConfidence = parseFloat(req.body.yoloConfidence) || 0.5;
+
+    if (enableYolo && annotatedImagePaths.length > 0 && pythonPath) {
+      console.log('\n🤖 STEP 2.5: Running YOLO Auto-Annotation...');
+      console.log(`   Industry: ${yoloIndustry}, Confidence: ${yoloConfidence}`);
+
+      for (const imgInfo of annotatedImagePaths) {
+        try {
+          const imgPath = path.join(uploadDir, imgInfo.filename);
+          if (!fs.existsSync(imgPath)) continue;
+
+          console.log(`   🔍 YOLO processing: ${imgInfo.filename}`);
+
+          // Run YOLO detection
+          const yoloProcess = spawn(pythonPath, [
+            path.join(__dirname, 'yolo_detector.py'),
+            '--image', imgPath,
+            '--industry', yoloIndustry,
+            '--confidence', yoloConfidence.toString(),
+            '--output', uploadDir,
+            '--json'
+          ]);
+
+          let yoloOutput = '';
+          let yoloError = '';
+
+          yoloProcess.stdout.on('data', (data) => {
+            yoloOutput += data.toString();
+          });
+
+          yoloProcess.stderr.on('data', (data) => {
+            yoloError += data.toString();
+          });
+
+          await new Promise((resolve) => {
+            yoloProcess.on('close', (code) => {
+              if (code === 0) {
+                try {
+                  const detection = JSON.parse(yoloOutput)[0];
+                  yoloResults.push({
+                    image: imgInfo.filename,
+                    originalName: imgInfo.originalName,
+                    detections: detection.detections || [],
+                    detection_count: detection.detection_count || 0,
+                    annotated_image: detection.annotated_image ? path.basename(detection.annotated_image) : null
+                  });
+                  yoloDetectionCount += detection.detection_count || 0;
+                  console.log(`     ✅ Found ${detection.detection_count} objects`);
+                } catch (e) {
+                  console.warn(`     ⚠️ YOLO parse error: ${e.message}`);
+                }
+              } else {
+                console.warn(`     ⚠️ YOLO failed: ${yoloError}`);
+              }
+              resolve();
+            });
+          });
+        } catch (err) {
+          console.warn(`   ⚠️ YOLO error for ${imgInfo.filename}: ${err.message}`);
+        }
+      }
+
+      console.log(`   ✅ YOLO complete: ${yoloDetectionCount} total detections across ${yoloResults.length} images`);
+    }
+
     // Generate CSV output
     const csvOutput = generateAnnotationCSV(annotations);
 
@@ -515,7 +775,11 @@ app.post('/api/annotate-images', upload.fields([
           startTime: allFlightData[0]?.timestamp,
           endTime: allFlightData[allFlightData.length - 1]?.timestamp,
           recordCount: allFlightData.length
-        }
+        },
+        // YOLO results
+        yoloEnabled: enableYolo,
+        yoloResults: yoloResults,
+        yoloDetectionCount: yoloDetectionCount
       }
     });
 
@@ -756,7 +1020,8 @@ app.post('/api/parse-dji-log', upload.single('logFile'), async (req, res) => {
   console.log('🚁 DJI LOG PARSING REQUEST');
   console.log('='.repeat(60));
 
-  const djiLogBinary = path.join(__dirname, 'dji-log');
+  // Use the global dji-log binary path
+  const djiLogBinary = djiLogBinaryPath;
   let logFilePath = null;
   let csvOutputPath = null;
 
@@ -777,8 +1042,13 @@ app.post('/api/parse-dji-log', upload.single('logFile'), async (req, res) => {
     if (!fs.existsSync(csvOutputPath)) {
       console.log('🔄 Parsing log with dji-log binary...');
 
+      // Check if dji-log binary exists, try to download if not
       if (!fs.existsSync(djiLogBinary)) {
-        throw new Error('dji-log binary not found');
+        console.log('⚠️ DJI Log parser not found, attempting download...');
+        const downloaded = await ensureDjiLogBinary();
+        if (!downloaded) {
+          throw new Error('DJI Log parser not available. Download from https://github.com/lvauvillier/dji-log-parser/releases');
+        }
       }
 
       const apiKey = process.env.DJI_API_KEY || '6a1613c4a95bea88c227b4b760e528e';
@@ -937,9 +1207,10 @@ app.post('/api/analyze-drone', upload.array('images', 20), async (req, res) => {
 
     console.log('📸 Processing', req.files.length, 'drone images for vegetation health');
 
-    // Use Python from virtual environment
-    const pythonExecutable = path.join(__dirname, 'venv', 'bin', 'python3');
-    const pythonCommand = fs.existsSync(pythonExecutable) ? pythonExecutable : 'python3';
+    // Use configured Python path
+    if (!pythonPath) {
+      return res.status(500).json({ error: 'Python not found. Please install Python 3.9+ with required packages.' });
+    }
 
     const results = [];
 
@@ -948,7 +1219,7 @@ app.post('/api/analyze-drone', upload.array('images', 20), async (req, res) => {
       console.log(`\n🌿 Analyzing: ${img.originalname}`);
 
       // Call Python RGB analyzer
-      const pythonProcess = spawn(pythonCommand, [
+      const pythonProcess = spawn(pythonPath, [
         path.join(__dirname, 'rgb_analyzer.py'),
         '--image', imagePath,
         '--output', uploadDir,
@@ -1112,23 +1383,43 @@ except Exception as e:
 
 function runPythonScript(scriptPath, args) {
   return new Promise((resolve, reject) => {
-    const python = spawn('python3', [scriptPath, ...args]);
+    if (!pythonPath) {
+      reject(new Error('Python not found. Please install Python 3.9+'));
+      return;
+    }
+    
+    console.log('🐍 Running Python script:', scriptPath);
+    console.log('   Python:', pythonPath);
+    console.log('   Args:', args);
+    
+    const python = spawn(pythonPath, [scriptPath, ...args], {
+      cwd: path.dirname(scriptPath),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
 
     let stdout = '';
     let stderr = '';
 
     python.stdout.on('data', (data) => {
-      stdout += data.toString();
+      const text = data.toString();
+      stdout += text;
+      console.log('Python stdout:', text);
     });
 
     python.stderr.on('data', (data) => {
-      stderr += data.toString();
-      console.log('Python stderr:', data.toString());
+      const text = data.toString();
+      stderr += text;
+      console.log('Python stderr:', text);
     });
 
     python.on('close', (code) => {
+      console.log('Python exit code:', code);
+      console.log('Python stdout total:', stdout);
+      console.log('Python stderr total:', stderr);
+      
       if (code !== 0) {
-        reject(new Error(`Python script failed: ${stderr}`));
+        const errorMsg = stderr || stdout || 'Unknown Python error (no output)';
+        reject(new Error(`Python script failed (code ${code}): ${errorMsg}`));
         return;
       }
 
@@ -1146,16 +1437,16 @@ function runPythonScript(scriptPath, args) {
         }
 
         if (!jsonOutput) {
-          throw new Error('No valid JSON found in output');
+          throw new Error('No valid JSON found in output: ' + stdout);
         }
 
         if (jsonOutput.error) {
-          reject(new Error(jsonOutput.error));
+          reject(new Error(jsonOutput.error + (jsonOutput.traceback ? '\n' + jsonOutput.traceback : '')));
         } else {
           resolve(jsonOutput);
         }
       } catch (e) {
-        reject(new Error(`Failed to parse Python output: ${e.message}`));
+        reject(new Error(`Failed to parse Python output: ${e.message}\nOutput: ${stdout}`));
       }
     });
   });
@@ -1506,8 +1797,7 @@ app.post('/api/download-zip', async (req, res) => {
 
 // ==================== YOLO AUTO-ANNOTATION ====================
 
-// Create annotations directory
-const annotationsDir = path.join(__dirname, 'annotations');
+// Ensure annotations directory exists (use baseAnnotationsDir from top of file)
 if (!fs.existsSync(annotationsDir)) {
   fs.mkdirSync(annotationsDir, { recursive: true });
 }
@@ -1669,14 +1959,15 @@ app.post('/api/annotations/:imageId/export', async (req, res) => {
       const outputFilename = `exported_${imageId}.png`;
       const outputPath = path.join(uploadDir, outputFilename);
       
-      const pythonExecutable = path.join(__dirname, 'venv', 'bin', 'python3');
-      const pythonCommand = fs.existsSync(pythonExecutable) ? pythonExecutable : 'python3';
+      if (!pythonPath) {
+        return res.status(500).json({ error: 'Python not found for image export' });
+      }
       
       // Create a temp file with detections
       const detectionsFile = path.join(annotationsDir, `${imageId}_export_temp.json`);
       fs.writeFileSync(detectionsFile, JSON.stringify(data.detections));
       
-      const pythonProcess = spawn(pythonCommand, [
+      const pythonProcess = spawn(pythonPath, [
         path.join(__dirname, 'draw_annotations.py'),
         '--image', imagePath,
         '--detections', detectionsFile,
@@ -1757,14 +2048,16 @@ app.post('/api/auto-annotate', async (req, res) => {
       console.log(`\n🔍 Processing: ${filename}`);
       console.log(`   📍 Using GPS-annotated image: ${path.basename(imagePath)}`);
       
-      // Use Python from virtual environment
-      const pythonExecutable = path.join(__dirname, 'venv', 'bin', 'python3');
-      const pythonCommand = fs.existsSync(pythonExecutable) ? pythonExecutable : 'python3';
+      // Use configured Python path
+      if (!pythonPath) {
+        console.error('❌ Python not found for YOLO detection');
+        continue;
+      }
       
-      console.log(`   🐍 Using Python: ${pythonCommand}`);
+      console.log(`   🐍 Using Python: ${pythonPath}`);
       
       // Call Python YOLO detector
-      const pythonProcess = spawn(pythonCommand, [
+      const pythonProcess = spawn(pythonPath, [
         path.join(__dirname, 'yolo_detector.py'),
         '--image', imagePath,
         '--industry', industry || 'general',
@@ -2131,8 +2424,6 @@ app.get('/api/download-modified', async (req, res) => {
       // Also try to export image with drawn boxes
       try {
         const imageId = annotationFile.replace('_annotations.json', '');
-        const pythonExecutable = path.join(__dirname, 'venv', 'bin', 'python3');
-        const pythonCommand = fs.existsSync(pythonExecutable) ? pythonExecutable : 'python3';
         
         const { execSync } = require('child_process');
         const outputPath = path.join(__dirname, 'tmp', `annotated_${imageName}`);
@@ -2143,8 +2434,8 @@ app.get('/api/download-modified', async (req, res) => {
         }
         
         // Draw annotations on image
-        if (fs.existsSync(imagePath)) {
-          execSync(`${pythonCommand} "${path.join(__dirname, 'draw_annotations.py')}" --image "${imagePath}" --annotations "${annotationPath}" --output "${outputPath}"`, {
+        if (fs.existsSync(imagePath) && pythonPath) {
+          execSync(`"${pythonPath}" "${path.join(__dirname, 'draw_annotations.py')}" --image "${imagePath}" --annotations "${annotationPath}" --output "${outputPath}"`, {
             timeout: 30000,
             stdio: 'pipe'
           });
@@ -2248,10 +2539,14 @@ app.get('/api/export-annotations', (req, res) => {
 // Local TIF processor - merges georeferenced images into orthomosaic
 // Uses GDAL instead of external services
 
-// Helper function to run Python script
-function runPythonScript(scriptPath, args) {
+// Helper function to run Python script (for orthomosaic)
+function runPythonScriptOrtho(scriptPath, args) {
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn('python3', [scriptPath, ...args]);
+    if (!pythonPath) {
+      reject(new Error('Python not found'));
+      return;
+    }
+    const pythonProcess = spawn(pythonPath, [scriptPath, ...args]);
     
     let stdout = '';
     let stderr = '';
@@ -2655,7 +2950,7 @@ const dummyProcessHandle = {
 };
 
 if (false) { // Dead code block to preserve old spawn logic for reference
-    const processHandle = spawn('python3', [], {
+    const processHandle = spawn(pythonPath || 'python', [], {
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -3031,7 +3326,7 @@ app.post('/api/convert-tiff', upload.single('tiff'), async (req, res) => {
 
 // ==================== START SERVER ====================
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('\n' + '='.repeat(60));
   console.log('✅ SERVER RUNNING - ULTRA OPTIMIZED VERSION + YOLO');
   console.log('='.repeat(60));
@@ -3047,4 +3342,28 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('  ✓ YOLO auto-annotation (agriculture/rescue/general)');
   console.log('  ✓ Manual annotation correction system');
   console.log('\n💡 Waiting for requests...\n');
+  
+  // Signal to Electron that server is ready
+  if (process.send) {
+    process.send({ type: 'server-ready', port: PORT });
+  }
+  
+  // Set a global flag for in-process detection
+  global.serverReady = true;
+});
+
+// Handle server errors gracefully
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Server may already be running.`);
+    // If port is in use, server is probably already running - that's OK
+    if (process.send) {
+      process.send({ type: 'server-ready', port: PORT, existing: true });
+    }
+  } else {
+    console.error('❌ Server error:', err.message);
+    if (process.send) {
+      process.send({ type: 'server-error', error: err.message });
+    }
+  }
 });

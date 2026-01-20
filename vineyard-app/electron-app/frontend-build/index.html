@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ADER Drone Analyzer</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="leaflet.css" />
+    <!-- JSZip for ZIP file creation (local copy for offline use) -->
+    <script src="jszip.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -42,9 +43,20 @@
             border-bottom: 2px solid #4a5568;
         }
 
-        .logo-emoji {
-            font-size: 48px;
-            margin-bottom: 8px;
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px auto;
+            font-size: 36px;
+            font-weight: bold;
+            color: white;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
 
         .logo-title {
@@ -970,7 +982,7 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="logo">
-                <div class="logo-emoji">🍇</div>
+                <div class="logo-icon">A</div>
                 <div class="logo-title">ADER Analyzer</div>
                 <div class="logo-subtitle">Drone Data Processing</div>
             </div>
@@ -1670,7 +1682,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="leaflet.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
